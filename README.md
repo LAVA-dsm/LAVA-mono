@@ -11,9 +11,10 @@ LAVA는 프로젝트 아이디어를 실행 가능한 개발 계획으로 바꾸
 1. [AGENTS.md](./AGENTS.md)
 2. [docs/README.md](./docs/README.md)
 3. [DESIGN.md](./DESIGN.md)
-4. [docs/project/00-project-brief.md](./docs/project/00-project-brief.md)
-5. [docs/project/03-functional-requirements.md](./docs/project/03-functional-requirements.md)
-6. [docs/project/05-sprint-backlog.md](./docs/project/05-sprint-backlog.md)
+4. [TECH_STACK.md](./TECH_STACK.md)
+5. [docs/project/00-project-brief.md](./docs/project/00-project-brief.md)
+6. [docs/project/03-functional-requirements.md](./docs/project/03-functional-requirements.md)
+7. [docs/project/05-sprint-backlog.md](./docs/project/05-sprint-backlog.md)
 
 ## 문서 원칙
 
