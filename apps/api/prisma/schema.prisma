@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectType {
+  personal
+  team
+}
+
+enum ProjectStatus {
+  active
+  deleted
+}
+
+enum MemberRole {
+  leader
+  member
+}
+
+enum MemberStatus {
+  pending
+  accepted
+  rejected
+  left
+}
+
+enum InvitationStatus {
+  pending
+  accepted
+  rejected
+  expired
+}
+
+enum ProjectDocumentType {
+  feature_spec
+  api_spec
+}
+
+enum GeneratedBy {
+  ai
+  user
+}
+
+enum AiTargetType {
+  idea
+  feature_spec
+  api_spec
+  schedule
+}
+
+enum AiHistoryStatus {
+  success
+  failed
+}
+
+model User {
+  id              String             @id @default(uuid())
+  email           String             @unique
+  name            String
+  passwordHash    String
+  emailVerified   Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  ledProjects     Project[]          @relation("ProjectLeader")
+  memberships     ProjectMember[]
+  aiRequestHistory AiRequestHistory[]
+}
+
+model Project {
+  id                  String             @id @default(uuid())
+  name                String
+  type                ProjectType
+  leaderUserId        String
+  originalIdea        String
+  enhancedIdea        String?
+  ideaEnhancementUsed Boolean            @default(false)
+  startDate           DateTime
+  endDate             DateTime
+  status              ProjectStatus      @default(active)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  leader              User               @relation("ProjectLeader", fields: [leaderUserId], references: [id])
+  members             ProjectMember[]
+  invitations         ProjectInvitation[]
+  documents           ProjectDocument[]
+  aiRequestHistory    AiRequestHistory[]
+}
+
+model ProjectMember {
+  id         String       @id @default(uuid())
+  projectId  String
+  userId     String
+  role       MemberRole
+  status     MemberStatus @default(accepted)
+  major      String?
+  techStacks String[]     @default([])
+  availableTimes Json?
+  joinedAt   DateTime?
+  project    Project      @relation(fields: [projectId], references: [id])
+  user       User         @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+}
+
+model ProjectInvitation {
+  id        String           @id @default(uuid())
+  projectId String
+  email     String
+  tokenHash String
+  status    InvitationStatus @default(pending)
+  sentAt    DateTime         @default(now())
+  expiresAt DateTime
+  project   Project          @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, email])
+}
+
+model ProjectDocument {
+  id          String              @id @default(uuid())
+  projectId   String
+  type        ProjectDocumentType
+  content     String
+  generatedBy GeneratedBy
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  project     Project             @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, type])
+}
+
+model AiRequestHistory {
+  id                String          @id @default(uuid())
+  projectId         String
+  targetType        AiTargetType
+  requestedByUserId String
+  prompt            String
+  resultSummary     String
+  status            AiHistoryStatus
+  createdAt         DateTime        @default(now())
+  project           Project         @relation(fields: [projectId], references: [id])
+  requestedBy       User            @relation(fields: [requestedByUserId], references: [id])
+}

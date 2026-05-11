@@ -1,0 +1,7 @@
+:80 {
+  reverse_proxy api:4000
+}
+
+api.example.com {
+  reverse_proxy api:4000
+}
