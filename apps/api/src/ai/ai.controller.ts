@@ -1,13 +1,13 @@
 import { Body, Controller, Post, ServiceUnavailableException, UseGuards } from "@nestjs/common";
 import { ideaEnhanceInputSchema, type IdeaEnhanceInput } from "@lava/shared";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CurrentUserParam } from "../common/current-user.decorator";
 import type { CurrentUser } from "../common/current-user";
-import { DevAuthGuard } from "../common/dev-auth.guard";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AiService } from "./ai.service";
 
 @Controller("ai")
-@UseGuards(DevAuthGuard)
+@UseGuards(JwtAuthGuard)
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 

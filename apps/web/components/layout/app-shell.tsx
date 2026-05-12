@@ -1,14 +1,16 @@
+"use client";
+
 import {
   Bot,
   CalendarDays,
   FolderOpen,
   Home,
-  LogOut,
   Settings,
   Sparkles
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LogoutButton } from "./logout-button";
 
 const navItems = [
   { label: "대시보드", icon: Home, href: "#" },
@@ -55,7 +57,7 @@ export function AppShell({ title, children }: { title: ReactNode; children: Reac
               <p className="truncate text-sm font-bold text-lava-text">개발용 리더</p>
               <p className="truncate text-xs text-lava-secondary">dev-leader@lava.local</p>
             </div>
-            <LogOut className="h-4 w-4 text-brand-red" aria-hidden />
+            <LogoutButton />
           </div>
         </div>
       </aside>
