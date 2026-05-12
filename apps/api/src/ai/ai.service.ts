@@ -2,8 +2,14 @@ import { Injectable } from "@nestjs/common";
 import OpenAI from "openai";
 import {
   FALLBACK_DOCUMENT_CONTENT,
+  scheduleUpdateInputSchema,
+  type AvailableTime,
   type IdeaEnhanceInput,
-  type ProjectCreateInput
+  type MemberRole,
+  type ProjectCreateInput,
+  type ProjectScheduleSummary,
+  type ProjectType,
+  type ScheduleItemInput
 } from "@lava/shared";
 
 export type GeneratedDocuments = {
@@ -11,6 +17,37 @@ export type GeneratedDocuments = {
   apiSpec: string;
   featureSpecFailed: boolean;
   apiSpecFailed: boolean;
+};
+
+export type AiScheduleProjectContext = {
+  id: string;
+  name: string;
+  type: ProjectType;
+  idea: string;
+  startDate: string;
+  endDate: string;
+};
+
+export type AiScheduleMemberContext = {
+  userId: string;
+  name: string;
+  role: MemberRole;
+  major: string;
+  techStacks: string[];
+  availableTimes: AvailableTime[];
+};
+
+export type AiScheduleGenerateInput = {
+  project: AiScheduleProjectContext;
+  members: AiScheduleMemberContext[];
+  featureSpec: string;
+};
+
+export type AiScheduleEditInput = {
+  project: AiScheduleProjectContext;
+  members: AiScheduleMemberContext[];
+  currentSchedule: ProjectScheduleSummary;
+  prompt: string;
 };
 
 @Injectable()
@@ -66,6 +103,37 @@ export class AiService {
     };
   }
 
+  async generateSchedule(input: AiScheduleGenerateInput): Promise<ScheduleItemInput[]> {
+    const prompt = [
+      "다음 프로젝트와 팀원 정보를 바탕으로 프로젝트 일정을 생성하세요.",
+      "응답은 설명 없이 JSON 객체만 반환하세요.",
+      "JSON 형식: {\"items\":[{\"title\":\"...\",\"type\":\"task|sprint|meeting\",\"description\":\"...\",\"assigneeUserIds\":[\"user-id\"],\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}]}",
+      "모든 일정은 날짜 단위이며 프로젝트 시작일과 종료일 사이여야 합니다.",
+      "역할 분담, 스프린트 단위 작업 구성, 회의 일정을 포함하세요.",
+      "회의 시간이 충분히 겹치지 않으면 리더 가능 시간을 기준으로 가장 겹치는 날에 배정하세요.",
+      `프로젝트:\n${JSON.stringify(input.project, null, 2)}`,
+      `멤버:\n${JSON.stringify(input.members, null, 2)}`,
+      `기능 명세서:\n${input.featureSpec}`
+    ].join("\n\n");
+
+    return this.generateScheduleItems(prompt);
+  }
+
+  async editSchedule(input: AiScheduleEditInput): Promise<ScheduleItemInput[]> {
+    const prompt = [
+      "다음 기존 프로젝트 일정을 사용자 요청에 맞게 수정하세요.",
+      "응답은 설명 없이 JSON 객체만 반환하세요.",
+      "JSON 형식: {\"items\":[{\"title\":\"...\",\"type\":\"task|sprint|meeting\",\"description\":\"...\",\"assigneeUserIds\":[\"user-id\"],\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}]}",
+      "모든 일정은 날짜 단위이며 프로젝트 시작일과 종료일 사이여야 합니다.",
+      `사용자 요청:\n${input.prompt}`,
+      `프로젝트:\n${JSON.stringify(input.project, null, 2)}`,
+      `멤버:\n${JSON.stringify(input.members, null, 2)}`,
+      `현재 일정:\n${JSON.stringify(input.currentSchedule.items, null, 2)}`
+    ].join("\n\n");
+
+    return this.generateScheduleItems(prompt);
+  }
+
   private async generateFeatureSpec(input: ProjectCreateInput): Promise<string> {
     const idea = input.enhancedIdea || input.originalIdea;
     const prompt = [
@@ -94,6 +162,19 @@ export class AiService {
     ].join("\n\n");
 
     return this.generateText(prompt);
+  }
+
+  private async generateScheduleItems(prompt: string): Promise<ScheduleItemInput[]> {
+    const text = await this.generateText(prompt);
+    const jsonText = this.extractJson(text);
+    const parsed = scheduleUpdateInputSchema.parse(JSON.parse(jsonText));
+    return parsed.items;
+  }
+
+  private extractJson(text: string): string {
+    const trimmed = text.trim();
+    const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+    return fenced?.[1]?.trim() || trimmed;
   }
 
   private async generateText(prompt: string): Promise<string> {

@@ -58,6 +58,17 @@ enum AiHistoryStatus {
   failed
 }
 
+enum EmailVerificationPurpose {
+  signup
+  password_reset
+}
+
+enum ScheduleItemType {
+  task
+  sprint
+  meeting
+}
+
 model User {
   id              String             @id @default(uuid())
   email           String             @unique
@@ -69,6 +80,20 @@ model User {
   ledProjects     Project[]          @relation("ProjectLeader")
   memberships     ProjectMember[]
   aiRequestHistory AiRequestHistory[]
+}
+
+model EmailVerification {
+  id           String                   @id @default(uuid())
+  email        String
+  codeHash     String
+  purpose      EmailVerificationPurpose
+  attemptCount Int                      @default(0)
+  blockedUntil DateTime?
+  expiresAt    DateTime
+  sentAt       DateTime                 @default(now())
+  verifiedAt   DateTime?
+
+  @@unique([email, purpose])
 }
 
 model Project {
@@ -88,6 +113,7 @@ model Project {
   members             ProjectMember[]
   invitations         ProjectInvitation[]
   documents           ProjectDocument[]
+  schedule            ProjectSchedule?
   aiRequestHistory    AiRequestHistory[]
 }
 
@@ -131,6 +157,28 @@ model ProjectDocument {
   project     Project             @relation(fields: [projectId], references: [id])
 
   @@unique([projectId, type])
+}
+
+model ProjectSchedule {
+  id          String         @id @default(uuid())
+  projectId   String         @unique
+  generatedBy GeneratedBy
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  project     Project        @relation(fields: [projectId], references: [id])
+  items       ScheduleItem[]
+}
+
+model ScheduleItem {
+  id              String           @id @default(uuid())
+  scheduleId      String
+  title           String
+  type            ScheduleItemType
+  description     String
+  assigneeUserIds String[]         @default([])
+  startDate       DateTime
+  endDate         DateTime
+  schedule        ProjectSchedule  @relation(fields: [scheduleId], references: [id])
 }
 
 model AiRequestHistory {

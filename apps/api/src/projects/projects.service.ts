@@ -1,14 +1,26 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
-  NotFoundException
+  NotFoundException,
+  ServiceUnavailableException
 } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
 import {
   FALLBACK_DOCUMENT_CONTENT,
+  INVITATION_EXPIRES_DAYS,
+  availableTimeSchema,
+  scheduleUpdateInputSchema,
+  type InvitationDetail,
+  type InvitationSummary,
+  type ParticipationInput,
   type ProjectCreateInput,
-  type ProjectSummary
+  type ProjectMemberSummary,
+  type ProjectScheduleSummary,
+  type ProjectSummary,
+  type ScheduleItemInput,
+  type ScheduleItemSummary
 } from "@lava/shared";
 import { AiService, type GeneratedDocuments } from "../ai/ai.service";
 import type { CurrentUser } from "../common/current-user";
@@ -21,6 +33,9 @@ type InvitationDraft = {
   tokenHash: string;
   expiresAt: Date;
 };
+
+type ProjectForSummary = NonNullable<Awaited<ReturnType<ProjectsService["findProjectForSummary"]>>>;
+type InvitationForDetail = NonNullable<Awaited<ReturnType<ProjectsService["findInvitationByToken"]>>>;
 
 @Injectable()
 export class ProjectsService {
@@ -134,47 +149,229 @@ export class ProjectsService {
   }
 
   async getProject(projectId: string, user: CurrentUser): Promise<ProjectSummary> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        members: true,
-        invitations: true,
-        documents: {
-          orderBy: { type: "asc" }
+    const project = await this.findProjectForSummary(projectId);
+    this.assertProjectAccess(project, user);
+    return this.toProjectSummary(project, user);
+  }
+
+  async getProjectInvitations(projectId: string, user: CurrentUser): Promise<{ invitations: InvitationSummary[] }> {
+    const project = await this.findProjectForSummary(projectId);
+    this.assertLeader(project, user);
+    return {
+      invitations: project.invitations.map((invitation) => this.toInvitationSummary(invitation))
+    };
+  }
+
+  async getInvitation(token: string): Promise<InvitationDetail> {
+    const invitation = await this.findInvitationByToken(token);
+    return this.toInvitationDetail(await this.refreshExpiredInvitation(invitation));
+  }
+
+  async acceptInvitation(
+    token: string,
+    input: ParticipationInput,
+    user: CurrentUser
+  ): Promise<ProjectSummary> {
+    const invitation = await this.refreshExpiredInvitation(await this.findInvitationByToken(token));
+    this.assertInvitationCanBeHandled(invitation, user);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.projectInvitation.update({
+        where: { id: invitation.id },
+        data: { status: "accepted" }
+      });
+
+      await tx.projectMember.upsert({
+        where: {
+          projectId_userId: {
+            projectId: invitation.projectId,
+            userId: user.id
+          }
+        },
+        create: {
+          projectId: invitation.projectId,
+          userId: user.id,
+          role: "member",
+          status: "accepted",
+          major: input.major,
+          techStacks: input.techStacks,
+          availableTimes: input.availableTimes,
+          joinedAt: new Date()
+        },
+        update: {
+          status: "accepted",
+          major: input.major,
+          techStacks: input.techStacks,
+          availableTimes: input.availableTimes,
+          joinedAt: new Date()
         }
+      });
+    });
+
+    return this.getProject(invitation.projectId, user);
+  }
+
+  async rejectInvitation(token: string, user: CurrentUser): Promise<InvitationDetail> {
+    const invitation = await this.refreshExpiredInvitation(await this.findInvitationByToken(token));
+    this.assertInvitationCanBeHandled(invitation, user);
+
+    const updated = await this.prisma.projectInvitation.update({
+      where: { id: invitation.id },
+      data: { status: "rejected" },
+      include: {
+        project: true
       }
     });
 
-    if (!project || project.status !== "active") {
-      throw new NotFoundException("프로젝트를 찾을 수 없습니다.");
+    await this.prisma.projectMember.deleteMany({
+      where: {
+        projectId: invitation.projectId,
+        userId: user.id,
+        status: "pending"
+      }
+    });
+
+    return this.toInvitationDetail(updated);
+  }
+
+  async updateMyParticipation(
+    projectId: string,
+    input: ParticipationInput,
+    user: CurrentUser
+  ): Promise<ProjectSummary> {
+    const project = await this.findProjectForSummary(projectId);
+    this.assertProjectAccess(project, user);
+
+    const membership = project.members.find((member) => member.userId === user.id && member.status === "accepted");
+    if (!membership) {
+      throw new ForbiddenException("프로젝트 참여 정보 수정 권한이 없습니다.");
     }
 
-    const hasAccess =
-      project.leaderUserId === user.id ||
-      project.members.some((member) => member.userId === user.id && member.status === "accepted");
+    await this.prisma.projectMember.update({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId: user.id
+        }
+      },
+      data: {
+        major: input.major,
+        techStacks: input.techStacks,
+        availableTimes: input.availableTimes
+      }
+    });
 
-    if (!hasAccess) {
-      throw new ForbiddenException("프로젝트 접근 권한이 없습니다.");
+    return this.getProject(projectId, user);
+  }
+
+  async getSchedule(projectId: string, user: CurrentUser): Promise<ProjectScheduleSummary | null> {
+    const project = await this.findProjectForSummary(projectId);
+    this.assertProjectAccess(project, user);
+    return project.schedule ? this.toScheduleSummary(project.schedule) : null;
+  }
+
+  async generateSchedule(projectId: string, user: CurrentUser): Promise<ProjectScheduleSummary> {
+    const project = await this.findProjectForSummary(projectId);
+    this.assertLeader(project, user);
+    const members = this.getReadyMembers(project);
+    const featureSpec = project.documents.find((document) => document.type === "feature_spec")?.content || "";
+
+    try {
+      const items = await this.aiService.generateSchedule({
+        project: this.toAiProjectContext(project),
+        members: members.map((member) => this.toAiMemberContext(member)),
+        featureSpec
+      });
+      this.validateScheduleItems(project, items);
+      const schedule = await this.replaceSchedule(project.id, "ai", items);
+
+      await this.prisma.aiRequestHistory.create({
+        data: {
+          projectId: project.id,
+          targetType: "schedule",
+          requestedByUserId: user.id,
+          prompt: "프로젝트 일정 생성",
+          resultSummary: "일정 생성 성공",
+          status: "success"
+        }
+      });
+
+      return schedule;
+    } catch (error) {
+      await this.prisma.aiRequestHistory.create({
+        data: {
+          projectId: project.id,
+          targetType: "schedule",
+          requestedByUserId: user.id,
+          prompt: "프로젝트 일정 생성",
+          resultSummary: error instanceof Error ? error.message : "일정 생성 실패",
+          status: "failed"
+        }
+      });
+
+      throw new ServiceUnavailableException("AI 일정 생성에 실패했어요.");
+    }
+  }
+
+  async updateSchedule(
+    projectId: string,
+    input: { items: ScheduleItemInput[] },
+    user: CurrentUser
+  ): Promise<ProjectScheduleSummary> {
+    const project = await this.findProjectForSummary(projectId);
+    this.assertLeader(project, user);
+    const parsed = scheduleUpdateInputSchema.parse(input);
+    this.validateScheduleItems(project, parsed.items);
+    return this.replaceSchedule(project.id, "user", parsed.items);
+  }
+
+  async editScheduleWithAi(projectId: string, prompt: string, user: CurrentUser): Promise<ProjectScheduleSummary> {
+    const project = await this.findProjectForSummary(projectId);
+    this.assertLeader(project, user);
+
+    if (!project.schedule) {
+      throw new BadRequestException("먼저 일정을 생성해 주세요.");
     }
 
-    return {
-      id: project.id,
-      name: project.name,
-      type: project.type,
-      originalIdea: project.originalIdea,
-      enhancedIdea: project.enhancedIdea,
-      ideaEnhancementUsed: project.ideaEnhancementUsed,
-      startDate: this.toDateOnly(project.startDate),
-      endDate: this.toDateOnly(project.endDate),
-      inviteCount: project.invitations.filter((invitation) => invitation.status === "pending").length,
-      documents: project.documents.map((document) => ({
-        id: document.id,
-        type: document.type,
-        content: document.content,
-        generatedBy: document.generatedBy,
-        updatedAt: document.updatedAt.toISOString()
-      }))
-    };
+    const members = this.getReadyMembers(project);
+    const currentSchedule = this.toScheduleSummary(project.schedule);
+
+    try {
+      const items = await this.aiService.editSchedule({
+        project: this.toAiProjectContext(project),
+        members: members.map((member) => this.toAiMemberContext(member)),
+        currentSchedule,
+        prompt
+      });
+      this.validateScheduleItems(project, items);
+      const schedule = await this.replaceSchedule(project.id, "ai", items);
+
+      await this.prisma.aiRequestHistory.create({
+        data: {
+          projectId: project.id,
+          targetType: "schedule",
+          requestedByUserId: user.id,
+          prompt,
+          resultSummary: "일정 AI 수정 성공",
+          status: "success"
+        }
+      });
+
+      return schedule;
+    } catch (error) {
+      await this.prisma.aiRequestHistory.create({
+        data: {
+          projectId: project.id,
+          targetType: "schedule",
+          requestedByUserId: user.id,
+          prompt,
+          resultSummary: error instanceof Error ? error.message : "일정 AI 수정 실패",
+          status: "failed"
+        }
+      });
+
+      throw new ServiceUnavailableException("AI 일정 수정에 실패했어요.");
+    }
   }
 
   private async generateDocumentsWithFallback(
@@ -195,18 +392,312 @@ export class ProjectsService {
     }
   }
 
+  private async replaceSchedule(
+    projectId: string,
+    generatedBy: "ai" | "user",
+    items: ScheduleItemInput[]
+  ): Promise<ProjectScheduleSummary> {
+    const schedule = await this.prisma.$transaction(async (tx) => {
+      const persistedSchedule = await tx.projectSchedule.upsert({
+        where: { projectId },
+        create: {
+          projectId,
+          generatedBy
+        },
+        update: {
+          generatedBy
+        }
+      });
+
+      await tx.scheduleItem.deleteMany({
+        where: { scheduleId: persistedSchedule.id }
+      });
+
+      await tx.scheduleItem.createMany({
+        data: items.map((item) => ({
+          scheduleId: persistedSchedule.id,
+          title: item.title,
+          type: item.type,
+          description: item.description,
+          assigneeUserIds: item.assigneeUserIds,
+          startDate: new Date(`${item.startDate}T00:00:00.000Z`),
+          endDate: new Date(`${item.endDate}T00:00:00.000Z`)
+        }))
+      });
+
+      return tx.projectSchedule.findUnique({
+        where: { id: persistedSchedule.id },
+        include: {
+          items: {
+            orderBy: [{ startDate: "asc" }, { endDate: "asc" }]
+          }
+        }
+      });
+    });
+
+    if (!schedule) {
+      throw new NotFoundException("일정을 찾을 수 없습니다.");
+    }
+
+    return this.toScheduleSummary(schedule);
+  }
+
+  private validateScheduleItems(project: ProjectForSummary, items: ScheduleItemInput[]) {
+    const projectStart = project.startDate.getTime();
+    const projectEnd = project.endDate.getTime();
+    const acceptedUserIds = new Set(
+      project.members.filter((member) => member.status === "accepted").map((member) => member.userId)
+    );
+
+    for (const item of items) {
+      const itemStart = new Date(`${item.startDate}T00:00:00.000Z`).getTime();
+      const itemEnd = new Date(`${item.endDate}T00:00:00.000Z`).getTime();
+
+      if (itemStart < projectStart || itemEnd > projectEnd) {
+        throw new BadRequestException("일정은 프로젝트 기간 안에 있어야 합니다.");
+      }
+
+      const unknownAssignee = item.assigneeUserIds.find((userId) => !acceptedUserIds.has(userId));
+      if (unknownAssignee) {
+        throw new BadRequestException("프로젝트 멤버만 담당자로 지정할 수 있습니다.");
+      }
+    }
+  }
+
+  private getReadyMembers(project: ProjectForSummary) {
+    const acceptedMembers = project.members.filter((member) => member.status === "accepted");
+    const missingMember = acceptedMembers.find((member) => {
+      const availableTimes = this.toAvailableTimes(member.availableTimes);
+      return !member.major || member.techStacks.length === 0 || availableTimes.length === 0;
+    });
+
+    if (missingMember) {
+      throw new BadRequestException("모든 참여 멤버의 전공, 기술 스택, 참여 가능 시간을 먼저 입력해 주세요.");
+    }
+
+    return acceptedMembers;
+  }
+
+  private assertProjectAccess(project: ProjectForSummary, user: CurrentUser) {
+    const hasAccess =
+      project.leaderUserId === user.id ||
+      project.members.some((member) => member.userId === user.id && member.status === "accepted");
+
+    if (!hasAccess) {
+      throw new ForbiddenException("프로젝트 접근 권한이 없습니다.");
+    }
+  }
+
+  private assertLeader(project: ProjectForSummary, user: CurrentUser) {
+    if (project.leaderUserId !== user.id) {
+      throw new ForbiddenException("프로젝트 리더 권한이 필요합니다.");
+    }
+  }
+
+  private assertInvitationCanBeHandled(invitation: InvitationForDetail, user: CurrentUser) {
+    if (invitation.status !== "pending") {
+      throw new BadRequestException("이미 처리된 초대입니다.");
+    }
+
+    if (invitation.project.status !== "active") {
+      throw new NotFoundException("프로젝트를 찾을 수 없습니다.");
+    }
+
+    if (invitation.email !== user.email) {
+      throw new ForbiddenException("초대받은 이메일로 로그인해 주세요.");
+    }
+  }
+
+  private async refreshExpiredInvitation(invitation: InvitationForDetail): Promise<InvitationForDetail> {
+    if (invitation.status !== "pending" || invitation.expiresAt >= new Date()) {
+      return invitation;
+    }
+
+    return this.prisma.projectInvitation.update({
+      where: { id: invitation.id },
+      data: { status: "expired" },
+      include: { project: true }
+    });
+  }
+
+  async findProjectForSummary(projectId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        members: {
+          include: {
+            user: true
+          },
+          orderBy: [{ role: "asc" }, { joinedAt: "asc" }]
+        },
+        invitations: {
+          orderBy: { sentAt: "asc" }
+        },
+        documents: {
+          orderBy: { type: "asc" }
+        },
+        schedule: {
+          include: {
+            items: {
+              orderBy: [{ startDate: "asc" }, { endDate: "asc" }]
+            }
+          }
+        }
+      }
+    });
+
+    if (!project || project.status !== "active") {
+      throw new NotFoundException("프로젝트를 찾을 수 없습니다.");
+    }
+
+    return project;
+  }
+
+  async findInvitationByToken(token: string) {
+    const tokenHash = this.hashInvitationToken(token);
+    const invitation = await this.prisma.projectInvitation.findFirst({
+      where: { tokenHash },
+      include: {
+        project: true
+      }
+    });
+
+    if (!invitation) {
+      throw new NotFoundException("초대를 찾을 수 없습니다.");
+    }
+
+    return invitation;
+  }
+
+  private toProjectSummary(project: ProjectForSummary, user: CurrentUser): ProjectSummary {
+    const currentMembership = project.members.find((member) => member.userId === user.id && member.status === "accepted");
+
+    return {
+      id: project.id,
+      name: project.name,
+      type: project.type,
+      originalIdea: project.originalIdea,
+      enhancedIdea: project.enhancedIdea,
+      ideaEnhancementUsed: project.ideaEnhancementUsed,
+      startDate: this.toDateOnly(project.startDate),
+      endDate: this.toDateOnly(project.endDate),
+      inviteCount: project.invitations.filter((invitation) => invitation.status === "pending").length,
+      currentUserId: user.id,
+      currentUserRole: currentMembership?.role ?? (project.leaderUserId === user.id ? "leader" : null),
+      documents: project.documents.map((document) => ({
+        id: document.id,
+        type: document.type,
+        content: document.content,
+        generatedBy: document.generatedBy,
+        updatedAt: document.updatedAt.toISOString()
+      })),
+      members: project.members.map((member) => this.toMemberSummary(member)),
+      invitations: project.invitations.map((invitation) => this.toInvitationSummary(invitation)),
+      schedule: project.schedule ? this.toScheduleSummary(project.schedule) : null
+    };
+  }
+
+  private toMemberSummary(member: ProjectForSummary["members"][number]): ProjectMemberSummary {
+    return {
+      id: member.id,
+      userId: member.userId,
+      email: member.user.email,
+      name: member.user.name,
+      role: member.role,
+      status: member.status,
+      major: member.major,
+      techStacks: member.techStacks,
+      availableTimes: this.toAvailableTimes(member.availableTimes),
+      joinedAt: member.joinedAt?.toISOString() ?? null
+    };
+  }
+
+  private toInvitationSummary(invitation: ProjectForSummary["invitations"][number]): InvitationSummary {
+    return {
+      id: invitation.id,
+      email: invitation.email,
+      status: invitation.status,
+      sentAt: invitation.sentAt.toISOString(),
+      expiresAt: invitation.expiresAt.toISOString()
+    };
+  }
+
+  private toInvitationDetail(invitation: InvitationForDetail): InvitationDetail {
+    return {
+      id: invitation.id,
+      projectId: invitation.projectId,
+      projectName: invitation.project.name,
+      email: invitation.email,
+      status: invitation.status,
+      sentAt: invitation.sentAt.toISOString(),
+      expiresAt: invitation.expiresAt.toISOString()
+    };
+  }
+
+  private toScheduleSummary(schedule: NonNullable<ProjectForSummary["schedule"]>): ProjectScheduleSummary {
+    return {
+      id: schedule.id,
+      generatedBy: schedule.generatedBy,
+      updatedAt: schedule.updatedAt.toISOString(),
+      items: schedule.items.map((item) => this.toScheduleItemSummary(item))
+    };
+  }
+
+  private toScheduleItemSummary(item: NonNullable<ProjectForSummary["schedule"]>["items"][number]): ScheduleItemSummary {
+    return {
+      id: item.id,
+      title: item.title,
+      type: item.type,
+      description: item.description,
+      assigneeUserIds: item.assigneeUserIds,
+      startDate: this.toDateOnly(item.startDate),
+      endDate: this.toDateOnly(item.endDate)
+    };
+  }
+
+  private toAiProjectContext(project: ProjectForSummary) {
+    return {
+      id: project.id,
+      name: project.name,
+      type: project.type,
+      idea: project.enhancedIdea || project.originalIdea,
+      startDate: this.toDateOnly(project.startDate),
+      endDate: this.toDateOnly(project.endDate)
+    };
+  }
+
+  private toAiMemberContext(member: ProjectForSummary["members"][number]) {
+    return {
+      userId: member.userId,
+      name: member.user.name,
+      role: member.role,
+      major: member.major || "",
+      techStacks: member.techStacks,
+      availableTimes: this.toAvailableTimes(member.availableTimes)
+    };
+  }
+
+  private toAvailableTimes(value: unknown) {
+    const parsed = availableTimeSchema.array().safeParse(value);
+    return parsed.success ? parsed.data : [];
+  }
+
   private createInvitationDraft(email: string): InvitationDraft {
     const token = randomBytes(32).toString("hex");
     return {
       email,
       token,
-      tokenHash: createHash("sha256").update(token).digest("hex"),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      tokenHash: this.hashInvitationToken(token),
+      expiresAt: new Date(Date.now() + INVITATION_EXPIRES_DAYS * 24 * 60 * 60 * 1000)
     };
   }
 
+  private hashInvitationToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
   private buildInvitationUrl(token: string): string {
-    const origin = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
+    const origin = process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() || "http://localhost:3000";
     return `${origin}/invitations/${token}`;
   }
 

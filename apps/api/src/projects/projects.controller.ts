@@ -1,13 +1,22 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
-import { projectCreateInputSchema, type ProjectCreateInput } from "@lava/shared";
+import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from "@nestjs/common";
+import {
+  aiScheduleEditInputSchema,
+  participationInputSchema,
+  projectCreateInputSchema,
+  scheduleUpdateInputSchema,
+  type AiScheduleEditInput,
+  type ParticipationInput,
+  type ProjectCreateInput,
+  type ScheduleUpdateInput
+} from "@lava/shared";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import type { CurrentUser } from "../common/current-user";
 import { CurrentUserParam } from "../common/current-user.decorator";
-import { DevAuthGuard } from "../common/dev-auth.guard";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ProjectsService } from "./projects.service";
 
 @Controller("projects")
-@UseGuards(DevAuthGuard)
+@UseGuards(JwtAuthGuard)
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
@@ -22,5 +31,73 @@ export class ProjectsController {
   @Get(":id")
   getProject(@CurrentUserParam() user: CurrentUser, @Param("id") id: string) {
     return this.projectsService.getProject(id, user);
+  }
+
+  @Get(":id/invitations")
+  getProjectInvitations(@CurrentUserParam() user: CurrentUser, @Param("id") id: string) {
+    return this.projectsService.getProjectInvitations(id, user);
+  }
+
+  @Patch(":id/members/me/participation")
+  updateMyParticipation(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(participationInputSchema)) body: ParticipationInput
+  ) {
+    return this.projectsService.updateMyParticipation(id, body, user);
+  }
+
+  @Post(":id/schedule/generate")
+  generateSchedule(@CurrentUserParam() user: CurrentUser, @Param("id") id: string) {
+    return this.projectsService.generateSchedule(id, user);
+  }
+
+  @Get(":id/schedule")
+  getSchedule(@CurrentUserParam() user: CurrentUser, @Param("id") id: string) {
+    return this.projectsService.getSchedule(id, user);
+  }
+
+  @Put(":id/schedule")
+  updateSchedule(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(scheduleUpdateInputSchema)) body: ScheduleUpdateInput
+  ) {
+    return this.projectsService.updateSchedule(id, body, user);
+  }
+
+  @Post(":id/schedule/ai-edit")
+  editScheduleWithAi(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(aiScheduleEditInputSchema)) body: AiScheduleEditInput
+  ) {
+    return this.projectsService.editScheduleWithAi(id, body.prompt, user);
+  }
+}
+
+@Controller("invitations")
+export class InvitationsController {
+  constructor(private readonly projectsService: ProjectsService) {}
+
+  @Get(":token")
+  getInvitation(@Param("token") token: string) {
+    return this.projectsService.getInvitation(token);
+  }
+
+  @Post(":token/accept")
+  @UseGuards(JwtAuthGuard)
+  acceptInvitation(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("token") token: string,
+    @Body(new ZodValidationPipe(participationInputSchema)) body: ParticipationInput
+  ) {
+    return this.projectsService.acceptInvitation(token, body, user);
+  }
+
+  @Post(":token/reject")
+  @UseGuards(JwtAuthGuard)
+  rejectInvitation(@CurrentUserParam() user: CurrentUser, @Param("token") token: string) {
+    return this.projectsService.rejectInvitation(token, user);
   }
 }

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { projectCreateInputSchema } from "./index";
+import {
+  loginInputSchema,
+  participationInputSchema,
+  projectCreateInputSchema,
+  scheduleUpdateInputSchema,
+  signupCompleteInputSchema,
+  signupVerifyInputSchema
+} from "./index";
 
 const longIdea =
   "LAVA는 팀 프로젝트를 시작하는 사용자가 아이디어를 구체화하고 기능 명세서와 API 명세서를 빠르게 만들 수 있게 돕는 서비스입니다. " +
@@ -94,6 +101,95 @@ describe("projectCreateInputSchema", () => {
       startDate: "2026-06-01",
       endDate: "2026-06-30",
       inviteEmails: ["not-an-email"]
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("auth schemas", () => {
+  it("accepts a valid signup verification code", () => {
+    const result = signupVerifyInputSchema.safeParse({
+      email: "user@example.com",
+      code: "123456"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a weak password when completing signup", () => {
+    const result = signupCompleteInputSchema.safeParse({
+      email: "user@example.com",
+      name: "사용자",
+      password: "password",
+      passwordConfirm: "password"
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("normalizes login email", () => {
+    const result = loginInputSchema.parse({
+      email: "USER@example.com",
+      password: "Passw0rd!"
+    });
+
+    expect(result.email).toBe("user@example.com");
+  });
+});
+
+describe("participationInputSchema", () => {
+  it("accepts major, tech stacks, and available times", () => {
+    const result = participationInputSchema.safeParse({
+      major: "컴퓨터공학",
+      techStacks: ["React", "NestJS"],
+      availableTimes: [{ dayOfWeek: "mon", startTime: "19:00", endTime: "21:00" }]
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unavailable time range", () => {
+    const result = participationInputSchema.safeParse({
+      major: "컴퓨터공학",
+      techStacks: ["React"],
+      availableTimes: [{ dayOfWeek: "mon", startTime: "21:00", endTime: "19:00" }]
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("scheduleUpdateInputSchema", () => {
+  it("accepts date-only schedule items", () => {
+    const result = scheduleUpdateInputSchema.safeParse({
+      items: [
+        {
+          title: "기능 구현",
+          type: "task",
+          description: "핵심 기능 구현",
+          assigneeUserIds: ["user-1"],
+          startDate: "2026-06-01",
+          endDate: "2026-06-03"
+        }
+      ]
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a schedule item ending before it starts", () => {
+    const result = scheduleUpdateInputSchema.safeParse({
+      items: [
+        {
+          title: "기능 구현",
+          type: "task",
+          description: "핵심 기능 구현",
+          assigneeUserIds: ["user-1"],
+          startDate: "2026-06-03",
+          endDate: "2026-06-01"
+        }
+      ]
     });
 
     expect(result.success).toBe(false);

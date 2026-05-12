@@ -149,7 +149,12 @@ export function ProjectWizard() {
         ideaEnhancementUsed: true
       }));
     } catch (enhanceError) {
-      setError(enhanceError instanceof Error ? enhanceError.message : "AI 아이디어 증강에 실패했어요.");
+      const message = enhanceError instanceof Error ? enhanceError.message : "AI 아이디어 증강에 실패했어요.";
+      if (message.includes("로그인이 필요")) {
+        router.push(`/login?next=${encodeURIComponent("/projects/new")}`);
+        return;
+      }
+      setError(message);
     } finally {
       setIsEnhancing(false);
     }
@@ -163,7 +168,12 @@ export function ProjectWizard() {
       const project = await apiClient.createProject(payload);
       router.push(`/projects/${project.id}`);
     } catch (createError) {
-      setError(createError instanceof Error ? formatValidationError(createError) : "프로젝트 생성에 실패했어요.");
+      const message = createError instanceof Error ? formatValidationError(createError) : "프로젝트 생성에 실패했어요.";
+      if (message.includes("로그인이 필요")) {
+        router.push(`/login?next=${encodeURIComponent("/projects/new")}`);
+        return;
+      }
+      setError(message);
     } finally {
       setIsCreating(false);
     }
