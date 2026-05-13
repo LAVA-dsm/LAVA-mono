@@ -3,7 +3,9 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
+  ArrowRight,
   CalendarCheck,
   Clock3,
   FileText,
@@ -141,7 +143,11 @@ function ProjectContent({
 
       <section className="mt-8 grid gap-6 xl:grid-cols-[1fr_420px]">
         <div className="space-y-6">
-          <DocumentsSection featureSpecUpdatedAt={featureSpec?.updatedAt} apiSpecUpdatedAt={apiSpec?.updatedAt} />
+          <DocumentsSection
+            projectId={project.id}
+            featureSpecUpdatedAt={featureSpec?.updatedAt}
+            apiSpecUpdatedAt={apiSpec?.updatedAt}
+          />
           <ScheduleSection project={project} onProjectChange={onProjectChange} />
         </div>
         <div className="space-y-6">
@@ -154,9 +160,11 @@ function ProjectContent({
 }
 
 function DocumentsSection({
+  projectId,
   featureSpecUpdatedAt,
   apiSpecUpdatedAt
 }: {
+  projectId: string;
   featureSpecUpdatedAt?: string;
   apiSpecUpdatedAt?: string;
 }) {
@@ -173,6 +181,7 @@ function DocumentsSection({
           description="앱의 핵심 비즈니스 로직과 화면별 상세 기능 요구사항이 정리된 문서입니다."
           meta={featureSpecUpdatedAt ? `최근 수정: ${formatDate(featureSpecUpdatedAt)}` : "생성 대기"}
           label="Markdown"
+          href={`/projects/${projectId}/documents/feature_spec`}
         />
         <DocumentCard
           icon={<FileText className="h-7 w-7 text-brand-primary" aria-hidden />}
@@ -180,6 +189,7 @@ function DocumentsSection({
           description="프론트엔드와 백엔드 통신을 위한 엔드포인트, Request/Response 규격이 정리된 문서입니다."
           meta={apiSpecUpdatedAt ? `최근 수정: ${formatDate(apiSpecUpdatedAt)}` : "생성 대기"}
           label="REST"
+          href={`/projects/${projectId}/documents/api_spec`}
         />
         <DocumentCard
           icon={<CalendarCheck className="h-7 w-7 text-lava-success" aria-hidden />}
@@ -198,13 +208,15 @@ function DocumentCard({
   title,
   description,
   meta,
-  label
+  label,
+  href
 }: {
   icon: ReactNode;
   title: string;
   description: string;
   meta: string;
   label: string;
+  href?: string;
 }) {
   return (
     <Card className="shadow-none">
@@ -217,6 +229,15 @@ function DocumentCard({
         <span className="text-xs text-lava-secondary">{meta}</span>
         <Badge>{label}</Badge>
       </div>
+      {href ? (
+        <Link
+          href={href}
+          className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-lava-borderStrong bg-white px-5 text-sm font-semibold text-lava-text transition hover:border-brand-primary hover:text-brand-primary"
+        >
+          열기
+          <ArrowRight className="h-4 w-4" aria-hidden />
+        </Link>
+      ) : null}
     </Card>
   );
 }

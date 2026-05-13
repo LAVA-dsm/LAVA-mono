@@ -9,13 +9,19 @@ import {
 import { createHash, randomBytes } from "node:crypto";
 import {
   FALLBACK_DOCUMENT_CONTENT,
+  FEATURE_SPEC_MAX_LENGTH,
   INVITATION_EXPIRES_DAYS,
   availableTimeSchema,
+  featureSpecContentSchema,
+  projectDocumentTypeSchema,
   scheduleUpdateInputSchema,
+  type DocumentUpdateInput,
   type InvitationDetail,
   type InvitationSummary,
   type ParticipationInput,
   type ProjectCreateInput,
+  type ProjectDocumentSummary,
+  type ProjectDocumentType,
   type ProjectMemberSummary,
   type ProjectScheduleSummary,
   type ProjectSummary,
@@ -160,6 +166,108 @@ export class ProjectsService {
     return {
       invitations: project.invitations.map((invitation) => this.toInvitationSummary(invitation))
     };
+  }
+
+  async getProjectDocument(
+    projectId: string,
+    rawType: string,
+    user: CurrentUser
+  ): Promise<ProjectDocumentSummary> {
+    const type = this.parseProjectDocumentType(rawType);
+    const project = await this.findProjectForSummary(projectId);
+    this.assertProjectAccess(project, user);
+    return this.toDocumentSummary(this.findProjectDocument(project, type));
+  }
+
+  async updateProjectDocument(
+    projectId: string,
+    rawType: string,
+    input: DocumentUpdateInput,
+    user: CurrentUser
+  ): Promise<ProjectDocumentSummary> {
+    const type = this.parseProjectDocumentType(rawType);
+    const project = await this.findProjectForSummary(projectId);
+    this.assertProjectAccess(project, user);
+    const document = this.findProjectDocument(project, type);
+    this.validateDocumentContent(type, input.content);
+
+    const updated = await this.prisma.projectDocument.update({
+      where: { id: document.id },
+      data: {
+        content: input.content,
+        generatedBy: "user"
+      }
+    });
+
+    return this.toDocumentSummary(updated);
+  }
+
+  async editProjectDocumentWithAi(
+    projectId: string,
+    rawType: string,
+    prompt: string,
+    user: CurrentUser
+  ): Promise<ProjectDocumentSummary> {
+    const type = this.parseProjectDocumentType(rawType);
+    const project = await this.findProjectForSummary(projectId);
+    this.assertProjectAccess(project, user);
+    const document = this.findProjectDocument(project, type);
+
+    try {
+      const content =
+        type === "feature_spec"
+          ? await this.aiService.editFeatureSpec({
+              project: this.toAiProjectContext(project),
+              currentFeatureSpec: document.content,
+              prompt
+            })
+          : await this.aiService.editApiSpec({
+              project: this.toAiProjectContext(project),
+              currentApiSpec: document.content,
+              featureSpec: project.documents.find((item) => item.type === "feature_spec")?.content,
+              prompt
+            });
+
+      this.validateDocumentContent(type, content);
+
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const nextDocument = await tx.projectDocument.update({
+          where: { id: document.id },
+          data: {
+            content,
+            generatedBy: "ai"
+          }
+        });
+
+        await tx.aiRequestHistory.create({
+          data: {
+            projectId: project.id,
+            targetType: type,
+            requestedByUserId: user.id,
+            prompt,
+            resultSummary: this.getDocumentAiSuccessSummary(type),
+            status: "success"
+          }
+        });
+
+        return nextDocument;
+      });
+
+      return this.toDocumentSummary(updated);
+    } catch (error) {
+      await this.prisma.aiRequestHistory.create({
+        data: {
+          projectId: project.id,
+          targetType: type,
+          requestedByUserId: user.id,
+          prompt,
+          resultSummary: error instanceof Error ? error.message : this.getDocumentAiFailureSummary(type),
+          status: "failed"
+        }
+      });
+
+      throw new ServiceUnavailableException(this.getDocumentAiFailureSummary(type));
+    }
   }
 
   async getInvitation(token: string): Promise<InvitationDetail> {
@@ -464,6 +572,43 @@ export class ProjectsService {
     }
   }
 
+  private parseProjectDocumentType(rawType: string): ProjectDocumentType {
+    const parsed = projectDocumentTypeSchema.safeParse(rawType);
+    if (!parsed.success) {
+      throw new BadRequestException("지원하지 않는 문서 유형입니다.");
+    }
+    return parsed.data;
+  }
+
+  private findProjectDocument(project: ProjectForSummary, type: ProjectDocumentType) {
+    const document = project.documents.find((item) => item.type === type);
+    if (!document) {
+      throw new NotFoundException("문서를 찾을 수 없습니다.");
+    }
+    return document;
+  }
+
+  private validateDocumentContent(type: ProjectDocumentType, content: string) {
+    if (type !== "feature_spec") {
+      return;
+    }
+
+    const parsed = featureSpecContentSchema.safeParse(content);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message || `기능 명세서는 ${FEATURE_SPEC_MAX_LENGTH}자 이하로 저장해야 합니다.`
+      );
+    }
+  }
+
+  private getDocumentAiSuccessSummary(type: ProjectDocumentType): string {
+    return type === "feature_spec" ? "기능 명세서 AI 수정 성공" : "API 명세서 AI 수정 성공";
+  }
+
+  private getDocumentAiFailureSummary(type: ProjectDocumentType): string {
+    return type === "feature_spec" ? "AI 기능 명세서 수정에 실패했어요." : "AI API 명세서 수정에 실패했어요.";
+  }
+
   private getReadyMembers(project: ProjectForSummary) {
     const acceptedMembers = project.members.filter((member) => member.status === "accepted");
     const missingMember = acceptedMembers.find((member) => {
@@ -584,16 +729,20 @@ export class ProjectsService {
       inviteCount: project.invitations.filter((invitation) => invitation.status === "pending").length,
       currentUserId: user.id,
       currentUserRole: currentMembership?.role ?? (project.leaderUserId === user.id ? "leader" : null),
-      documents: project.documents.map((document) => ({
-        id: document.id,
-        type: document.type,
-        content: document.content,
-        generatedBy: document.generatedBy,
-        updatedAt: document.updatedAt.toISOString()
-      })),
+      documents: project.documents.map((document) => this.toDocumentSummary(document)),
       members: project.members.map((member) => this.toMemberSummary(member)),
       invitations: project.invitations.map((invitation) => this.toInvitationSummary(invitation)),
       schedule: project.schedule ? this.toScheduleSummary(project.schedule) : null
+    };
+  }
+
+  private toDocumentSummary(document: ProjectForSummary["documents"][number]): ProjectDocumentSummary {
+    return {
+      id: document.id,
+      type: document.type,
+      content: document.content,
+      generatedBy: document.generatedBy,
+      updatedAt: document.updatedAt.toISOString()
     };
   }
 

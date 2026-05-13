@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import OpenAI from "openai";
 import {
   FALLBACK_DOCUMENT_CONTENT,
+  FEATURE_SPEC_MAX_LENGTH,
   scheduleUpdateInputSchema,
   type AvailableTime,
   type IdeaEnhanceInput,
@@ -47,6 +48,21 @@ export type AiScheduleEditInput = {
   project: AiScheduleProjectContext;
   members: AiScheduleMemberContext[];
   currentSchedule: ProjectScheduleSummary;
+  prompt: string;
+};
+
+export type AiDocumentProjectContext = AiScheduleProjectContext;
+
+export type AiFeatureSpecEditInput = {
+  project: AiDocumentProjectContext;
+  currentFeatureSpec: string;
+  prompt: string;
+};
+
+export type AiApiSpecEditInput = {
+  project: AiDocumentProjectContext;
+  currentApiSpec: string;
+  featureSpec?: string;
   prompt: string;
 };
 
@@ -132,6 +148,35 @@ export class AiService {
     ].join("\n\n");
 
     return this.generateScheduleItems(prompt);
+  }
+
+  async editFeatureSpec(input: AiFeatureSpecEditInput): Promise<string> {
+    const prompt = [
+      "다음 기존 기능 명세서를 사용자 요청에 맞게 수정하세요.",
+      "응답은 설명 없이 수정된 한국어 Markdown 기능 명세서 본문만 반환하세요.",
+      "각 기능은 기능명, 설명, 제약사항, 예외 처리를 포함해야 합니다.",
+      `수정된 본문은 저장 본문 기준 ${FEATURE_SPEC_MAX_LENGTH}자 이하로 간결하게 작성하세요.`,
+      `사용자 요청:\n${input.prompt}`,
+      `프로젝트:\n${JSON.stringify(input.project, null, 2)}`,
+      `현재 기능 명세서:\n${input.currentFeatureSpec}`
+    ].join("\n\n");
+
+    return this.generateText(prompt);
+  }
+
+  async editApiSpec(input: AiApiSpecEditInput): Promise<string> {
+    const prompt = [
+      "다음 기존 API 명세서를 사용자 요청에 맞게 수정하세요.",
+      "응답은 설명 없이 수정된 한국어 Markdown API 명세서 본문만 반환하세요.",
+      "각 API는 API 이름, HTTP 메서드, 경로, 요청 데이터, 응답 데이터, 주요 오류 케이스를 포함하세요.",
+      "담당자는 배정하지 마세요.",
+      `사용자 요청:\n${input.prompt}`,
+      `프로젝트:\n${JSON.stringify(input.project, null, 2)}`,
+      `현재 API 명세서:\n${input.currentApiSpec}`,
+      `기능 명세서:\n${input.featureSpec || "없음"}`
+    ].join("\n\n");
+
+    return this.generateText(prompt);
   }
 
   private async generateFeatureSpec(input: ProjectCreateInput): Promise<string> {

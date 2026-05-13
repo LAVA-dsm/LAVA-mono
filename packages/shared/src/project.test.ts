@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  aiDocumentEditInputSchema,
+  featureSpecContentSchema,
   loginInputSchema,
   participationInputSchema,
   projectCreateInputSchema,
@@ -191,6 +193,32 @@ describe("scheduleUpdateInputSchema", () => {
         }
       ]
     });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("document schemas", () => {
+  it("accepts a feature spec at the 2000 character limit", () => {
+    const result = featureSpecContentSchema.safeParse("가".repeat(2000));
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a feature spec over the 2000 character limit", () => {
+    const result = featureSpecContentSchema.safeParse("가".repeat(2001));
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty AI document edit prompt", () => {
+    const result = aiDocumentEditInputSchema.safeParse({ prompt: "   " });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an AI document edit prompt over 1000 characters", () => {
+    const result = aiDocumentEditInputSchema.safeParse({ prompt: "a".repeat(1001) });
 
     expect(result.success).toBe(false);
   });

@@ -1,10 +1,14 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from "@nestjs/common";
 import {
+  aiDocumentEditInputSchema,
   aiScheduleEditInputSchema,
+  documentUpdateInputSchema,
   participationInputSchema,
   projectCreateInputSchema,
   scheduleUpdateInputSchema,
+  type AiDocumentEditInput,
   type AiScheduleEditInput,
+  type DocumentUpdateInput,
   type ParticipationInput,
   type ProjectCreateInput,
   type ScheduleUpdateInput
@@ -36,6 +40,35 @@ export class ProjectsController {
   @Get(":id/invitations")
   getProjectInvitations(@CurrentUserParam() user: CurrentUser, @Param("id") id: string) {
     return this.projectsService.getProjectInvitations(id, user);
+  }
+
+  @Get(":id/documents/:type")
+  getProjectDocument(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("type") type: string
+  ) {
+    return this.projectsService.getProjectDocument(id, type, user);
+  }
+
+  @Put(":id/documents/:type")
+  updateProjectDocument(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("type") type: string,
+    @Body(new ZodValidationPipe(documentUpdateInputSchema)) body: DocumentUpdateInput
+  ) {
+    return this.projectsService.updateProjectDocument(id, type, body, user);
+  }
+
+  @Post(":id/documents/:type/ai-edit")
+  editProjectDocumentWithAi(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("type") type: string,
+    @Body(new ZodValidationPipe(aiDocumentEditInputSchema)) body: AiDocumentEditInput
+  ) {
+    return this.projectsService.editProjectDocumentWithAi(id, type, body.prompt, user);
   }
 
   @Patch(":id/members/me/participation")
