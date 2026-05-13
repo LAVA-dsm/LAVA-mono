@@ -68,9 +68,10 @@ type MockProject = {
   invitations: MockInvitation[];
   documents: Array<{
     id: string;
+    projectId?: string;
     type: "feature_spec" | "api_spec";
     content: string;
-    generatedBy: "ai";
+    generatedBy: "ai" | "user";
     updatedAt: Date;
   }>;
   schedule: MockSchedule | null;
@@ -220,6 +221,7 @@ function createPrismaMock() {
             documentCounter += 1;
             project.documents.push({
               id: `document-${documentCounter}`,
+              projectId: document.projectId,
               type: document.type,
               content: document.content,
               generatedBy: document.generatedBy,
@@ -228,6 +230,16 @@ function createPrismaMock() {
           }
         }
         return { count: data.length };
+      }),
+      update: vi.fn(async ({ where, data }) => {
+        for (const project of projects.values()) {
+          const document = project.documents.find((item) => item.id === where.id);
+          if (document) {
+            Object.assign(document, data, { updatedAt: new Date("2026-06-04T00:00:00.000Z") });
+            return document;
+          }
+        }
+        throw new Error("Document not found");
       })
     },
     projectSchedule: {
@@ -300,6 +312,8 @@ describe("ProjectsController", () => {
     generateInitialDocuments: ReturnType<typeof vi.fn>;
     generateSchedule: ReturnType<typeof vi.fn>;
     editSchedule: ReturnType<typeof vi.fn>;
+    editFeatureSpec: ReturnType<typeof vi.fn>;
+    editApiSpec: ReturnType<typeof vi.fn>;
   };
   let emailService: {
     sendInvitation: ReturnType<typeof vi.fn>;
@@ -324,7 +338,9 @@ describe("ProjectsController", () => {
           endDate: "2026-06-03"
         }
       ]),
-      editSchedule: vi.fn(async () => [])
+      editSchedule: vi.fn(async () => []),
+      editFeatureSpec: vi.fn(async () => "# 수정된 기능 명세서"),
+      editApiSpec: vi.fn(async () => "# 수정된 API 명세서")
     };
     emailService = {
       sendInvitation: vi.fn(async () => undefined)
@@ -377,6 +393,147 @@ describe("ProjectsController", () => {
     expect(response.body.inviteCount).toBe(1);
     expect(response.body.invitations[0]).toEqual(expect.objectContaining({ email: "teammate@example.com", status: "pending" }));
     expect(emailService.sendInvitation).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a generated feature spec for a project member", async () => {
+    const created = await request(app.getHttpServer())
+      .post("/projects")
+      .send({
+        name: "LAVA",
+        type: "personal",
+        originalIdea: longIdea,
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+        inviteEmails: []
+      })
+      .expect(201);
+
+    const response = await request(app.getHttpServer())
+      .get(`/projects/${created.body.id}/documents/feature_spec`)
+      .expect(200);
+
+    expect(response.body).toEqual(expect.objectContaining({ type: "feature_spec", content: "# 기능 명세서" }));
+  });
+
+  it("updates a feature spec directly and marks it as user generated", async () => {
+    const created = await request(app.getHttpServer())
+      .post("/projects")
+      .send({
+        name: "LAVA",
+        type: "personal",
+        originalIdea: longIdea,
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+        inviteEmails: []
+      })
+      .expect(201);
+
+    const response = await request(app.getHttpServer())
+      .put(`/projects/${created.body.id}/documents/feature_spec`)
+      .send({ content: "# 직접 수정한 기능 명세서" })
+      .expect(200);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({ type: "feature_spec", content: "# 직접 수정한 기능 명세서", generatedBy: "user" })
+    );
+  });
+
+  it("rejects feature spec updates over 2000 characters", async () => {
+    const created = await request(app.getHttpServer())
+      .post("/projects")
+      .send({
+        name: "LAVA",
+        type: "personal",
+        originalIdea: longIdea,
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+        inviteEmails: []
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .put(`/projects/${created.body.id}/documents/feature_spec`)
+      .send({ content: "가".repeat(2001) })
+      .expect(400);
+  });
+
+  it("blocks document access for non-members", async () => {
+    const created = await request(app.getHttpServer())
+      .post("/projects")
+      .send({
+        name: "LAVA",
+        type: "personal",
+        originalIdea: longIdea,
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+        inviteEmails: []
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get(`/projects/${created.body.id}/documents/api_spec`)
+      .set("x-test-user-id", "outsider-1")
+      .set("x-test-user-email", "outsider@example.com")
+      .expect(403);
+  });
+
+  it("edits a feature spec with AI and stores request history", async () => {
+    const created = await request(app.getHttpServer())
+      .post("/projects")
+      .send({
+        name: "LAVA",
+        type: "personal",
+        originalIdea: longIdea,
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+        inviteEmails: []
+      })
+      .expect(201);
+
+    const response = await request(app.getHttpServer())
+      .post(`/projects/${created.body.id}/documents/feature_spec/ai-edit`)
+      .send({ prompt: "로그인 기능을 상세화해줘." })
+      .expect(201);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({ type: "feature_spec", content: "# 수정된 기능 명세서", generatedBy: "ai" })
+    );
+    expect(aiService.editFeatureSpec).toHaveBeenCalledWith(
+      expect.objectContaining({ currentFeatureSpec: "# 기능 명세서", prompt: "로그인 기능을 상세화해줘." })
+    );
+    expect(prismaMock.prisma.aiRequestHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ targetType: "feature_spec", status: "success" })
+      })
+    );
+  });
+
+  it("keeps the current API spec when AI document editing fails", async () => {
+    aiService.editApiSpec.mockRejectedValueOnce(new Error("boom"));
+    const created = await request(app.getHttpServer())
+      .post("/projects")
+      .send({
+        name: "LAVA",
+        type: "personal",
+        originalIdea: longIdea,
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+        inviteEmails: []
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/projects/${created.body.id}/documents/api_spec/ai-edit`)
+      .send({ prompt: "REST 형식으로 다시 정리해줘." })
+      .expect(503);
+
+    const project = prismaMock.projects.get(created.body.id);
+    expect(project?.documents.find((document) => document.type === "api_spec")?.content).toBe("# API 명세서");
+    expect(prismaMock.prisma.aiRequestHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ targetType: "api_spec", status: "failed", resultSummary: "boom" })
+      })
+    );
   });
 
   it("accepts an invitation only for the invited email", async () => {

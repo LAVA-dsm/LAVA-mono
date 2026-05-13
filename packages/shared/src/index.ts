@@ -9,6 +9,7 @@ export const PROJECT_MAX_DURATION_DAYS = 365;
 export const INVITATION_EXPIRES_DAYS = 7;
 export const EMAIL_CODE_EXPIRES_MINUTES = 5;
 export const EMAIL_VERIFY_MAX_ATTEMPTS = 5;
+export const FEATURE_SPEC_MAX_LENGTH = 2000;
 
 export const projectTypeSchema = z.enum(["personal", "team"]);
 export type ProjectType = z.infer<typeof projectTypeSchema>;
@@ -209,6 +210,20 @@ export const projectDocumentSummarySchema = z.object({
   updatedAt: z.string()
 });
 export type ProjectDocumentSummary = z.infer<typeof projectDocumentSummarySchema>;
+
+export const featureSpecContentSchema = z
+  .string()
+  .max(FEATURE_SPEC_MAX_LENGTH, "기능 명세서는 2000자 이하로 저장해야 합니다.");
+
+export const documentUpdateInputSchema = z.object({
+  content: z.string()
+});
+export type DocumentUpdateInput = z.infer<typeof documentUpdateInputSchema>;
+
+export const aiDocumentEditInputSchema = z.object({
+  prompt: z.string().trim().min(1, "수정 요청을 입력해 주세요.").max(1000, "수정 요청은 1000자 이하로 입력해 주세요.")
+});
+export type AiDocumentEditInput = z.infer<typeof aiDocumentEditInputSchema>;
 
 export const projectMemberSummarySchema = z.object({
   id: z.string(),

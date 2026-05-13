@@ -1,10 +1,14 @@
 import type {
+  AiDocumentEditInput,
   AiScheduleEditInput,
   AuthEmailInput,
   AuthUser,
+  DocumentUpdateInput,
   IdeaEnhanceInput,
   InvitationDetail,
   InvitationSummary,
+  ProjectDocumentSummary,
+  ProjectDocumentType,
   LoginInput,
   ParticipationInput,
   ProjectCreateInput,
@@ -100,6 +104,24 @@ export const apiClient = {
     return requestJson<ProjectSummary>(`/projects/${id}`, {
       method: "GET",
       cache: "no-store"
+    });
+  },
+  getProjectDocument(id: string, type: ProjectDocumentType) {
+    return requestJson<ProjectDocumentSummary>(`/projects/${id}/documents/${type}`, {
+      method: "GET",
+      cache: "no-store"
+    });
+  },
+  updateProjectDocument(id: string, type: ProjectDocumentType, input: DocumentUpdateInput) {
+    return requestJson<ProjectDocumentSummary>(`/projects/${id}/documents/${type}`, {
+      method: "PUT",
+      body: JSON.stringify(input)
+    });
+  },
+  editProjectDocumentWithAi(id: string, type: ProjectDocumentType, input: AiDocumentEditInput) {
+    return requestJson<ProjectDocumentSummary>(`/projects/${id}/documents/${type}/ai-edit`, {
+      method: "POST",
+      body: JSON.stringify(input)
     });
   },
   getInvitation(token: string) {
