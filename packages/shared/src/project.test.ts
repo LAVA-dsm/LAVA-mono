@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aiDocumentEditInputSchema,
+  aiScheduleEditInputSchema,
   featureSpecContentSchema,
   loginInputSchema,
   participationInputSchema,
@@ -151,6 +152,26 @@ describe("participationInputSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("deduplicates and trims tech stacks", () => {
+    const result = participationInputSchema.parse({
+      major: "컴퓨터공학",
+      techStacks: [" React ", "NestJS", "React"],
+      availableTimes: [{ dayOfWeek: "mon", startTime: "19:00", endTime: "21:00" }]
+    });
+
+    expect(result.techStacks).toEqual(["React", "NestJS"]);
+  });
+
+  it("rejects missing participation info", () => {
+    const result = participationInputSchema.safeParse({
+      major: "",
+      techStacks: [],
+      availableTimes: []
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("rejects an unavailable time range", () => {
     const result = participationInputSchema.safeParse({
       major: "컴퓨터공학",
@@ -196,6 +217,12 @@ describe("scheduleUpdateInputSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("rejects an empty schedule item list", () => {
+    const result = scheduleUpdateInputSchema.safeParse({ items: [] });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("document schemas", () => {
@@ -219,6 +246,18 @@ describe("document schemas", () => {
 
   it("rejects an AI document edit prompt over 1000 characters", () => {
     const result = aiDocumentEditInputSchema.safeParse({ prompt: "a".repeat(1001) });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty AI schedule edit prompt", () => {
+    const result = aiScheduleEditInputSchema.safeParse({ prompt: "   " });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an AI schedule edit prompt over 1000 characters", () => {
+    const result = aiScheduleEditInputSchema.safeParse({ prompt: "a".repeat(1001) });
 
     expect(result.success).toBe(false);
   });

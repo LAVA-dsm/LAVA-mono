@@ -155,13 +155,13 @@ export class ProjectsService {
   }
 
   async getProject(projectId: string, user: CurrentUser): Promise<ProjectSummary> {
-    const project = await this.findProjectForSummary(projectId);
+    const project = await this.refreshExpiredProjectInvitations(await this.findProjectForSummary(projectId));
     this.assertProjectAccess(project, user);
     return this.toProjectSummary(project, user);
   }
 
   async getProjectInvitations(projectId: string, user: CurrentUser): Promise<{ invitations: InvitationSummary[] }> {
-    const project = await this.findProjectForSummary(projectId);
+    const project = await this.refreshExpiredProjectInvitations(await this.findProjectForSummary(projectId));
     this.assertLeader(project, user);
     return {
       invitations: project.invitations.map((invitation) => this.toInvitationSummary(invitation))
@@ -663,6 +663,28 @@ export class ProjectsService {
       data: { status: "expired" },
       include: { project: true }
     });
+  }
+
+  private async refreshExpiredProjectInvitations(project: ProjectForSummary): Promise<ProjectForSummary> {
+    const now = new Date();
+    const expiredInvitationIds = project.invitations
+      .filter((invitation) => invitation.status === "pending" && invitation.expiresAt < now)
+      .map((invitation) => invitation.id);
+
+    if (!expiredInvitationIds.length) {
+      return project;
+    }
+
+    await this.prisma.projectInvitation.updateMany({
+      where: {
+        id: { in: expiredInvitationIds }
+      },
+      data: {
+        status: "expired"
+      }
+    });
+
+    return this.findProjectForSummary(project.id);
   }
 
   async findProjectForSummary(projectId: string) {
