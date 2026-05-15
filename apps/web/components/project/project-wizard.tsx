@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -30,7 +30,6 @@ type FormState = {
   name: string;
   type: ProjectType;
   originalIdea: string;
-  enhancedIdea: string;
   ideaEnhancementUsed: boolean;
   startDate: string;
   endDate: string;
@@ -43,7 +42,6 @@ const initialState: FormState = {
   name: "",
   type: "team",
   originalIdea: "",
-  enhancedIdea: "",
   ideaEnhancementUsed: false,
   startDate: "",
   endDate: "",
@@ -79,7 +77,6 @@ export function ProjectWizard() {
   const inviteEmails = useMemo(() => parseInviteEmails(form.inviteEmailsText), [form.inviteEmailsText]);
   const isPersonal = form.type === "personal";
   const ideaLength = form.originalIdea.length;
-  const activeIdea = form.enhancedIdea || form.originalIdea;
 
   const updateField = <Key extends keyof FormState>(key: Key, value: FormState[Key]) => {
     setError(null);
@@ -89,7 +86,7 @@ export function ProjectWizard() {
   const nextStep = () => {
     setError(null);
     try {
-      if (step === 0 || step === 2) {
+      if (step === 0) {
         buildPayload();
       }
       if (step === 1 && form.type === "team") {
@@ -118,7 +115,6 @@ export function ProjectWizard() {
       name: form.name,
       type: form.type,
       originalIdea: form.originalIdea,
-      enhancedIdea: form.enhancedIdea || undefined,
       ideaEnhancementUsed: form.ideaEnhancementUsed,
       startDate: form.startDate,
       endDate: form.endDate,
@@ -136,6 +132,10 @@ export function ProjectWizard() {
     setIsEnhancing(true);
     setError(null);
     try {
+      if (!form.originalIdea.trim()) {
+        setError("아이디어를 입력해 주세요.");
+        return;
+      }
       const response = await apiClient.enhanceIdea({
         name: form.name,
         type: form.type,
@@ -145,7 +145,7 @@ export function ProjectWizard() {
       });
       setForm((current) => ({
         ...current,
-        enhancedIdea: response.enhancedIdea,
+        originalIdea: response.enhancedIdea,
         ideaEnhancementUsed: true
       }));
     } catch (enhanceError) {
@@ -259,15 +259,9 @@ export function ProjectWizard() {
               </Button>
               <span className="text-xs text-lava-secondary">증강은 프로젝트 생성 중 1회만 사용할 수 있습니다.</span>
             </div>
-            {form.enhancedIdea ? (
-              <div className="mt-5">
-                <FieldWrapper label="AI 증강 결과" hint="생성 결과는 직접 수정할 수 있습니다.">
-                  <Textarea
-                    value={form.enhancedIdea}
-                    onChange={(event) => updateField("enhancedIdea", event.target.value)}
-                    className="min-h-48 border-brand-primary bg-brand-warmBg"
-                  />
-                </FieldWrapper>
+            {form.ideaEnhancementUsed ? (
+              <div className="mt-5 rounded-lg border border-brand-primary bg-brand-warmBg p-4 text-sm text-lava-secondary">
+                AI가 아이디어를 현재 입력값에 반영했습니다. 아래 아이디어 칸의 내용이 바로 생성에 사용됩니다.
               </div>
             ) : null}
           </section>
@@ -348,7 +342,7 @@ export function ProjectWizard() {
             <div className="mt-5 rounded-lg border border-lava-borderStrong p-5">
               <h2 className="text-sm font-bold text-brand-red">아이디어 요약</h2>
               <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-lava-secondary">
-                {activeIdea || "아이디어가 아직 입력되지 않았습니다."}
+                {form.originalIdea || "아이디어가 아직 입력되지 않았습니다."}
               </p>
             </div>
           </section>
@@ -410,3 +404,4 @@ function Stepper({ step, projectType }: { step: WizardStep; projectType: Project
     </ol>
   );
 }
+

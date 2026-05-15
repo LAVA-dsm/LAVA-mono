@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aiDocumentEditInputSchema,
+  ideaEnhanceInputSchema,
   aiScheduleEditInputSchema,
   featureSpecContentSchema,
   loginInputSchema,
@@ -107,6 +108,20 @@ describe("projectCreateInputSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("ideaEnhanceInputSchema", () => {
+  it("accepts a short idea for enhancement", () => {
+    const result = ideaEnhanceInputSchema.safeParse({
+      name: "LAVA",
+      type: "team",
+      originalIdea: "짧은 아이디어",
+      startDate: "2026-06-01",
+      endDate: "2026-06-30"
+    });
+
+    expect(result.success).toBe(true);
   });
 });
 

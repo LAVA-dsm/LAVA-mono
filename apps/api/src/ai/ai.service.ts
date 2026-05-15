@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+﻿import { Injectable } from "@nestjs/common";
 import OpenAI from "openai";
 import {
   FALLBACK_DOCUMENT_CONTENT,
@@ -69,29 +69,36 @@ export type AiApiSpecEditInput = {
 @Injectable()
 export class AiService {
   private readonly model = process.env.OPENAI_MODEL || "gpt-5-mini";
+  private readonly timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS || 30_000);
 
   private get client(): OpenAI {
+    const baseURL = process.env.OPENAI_BASE_URL?.trim();
+
     return new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      ...(baseURL ? { baseURL } : {}),
       maxRetries: 0,
-      timeout: 10_000
+      timeout: this.timeoutMs
     });
   }
 
   async enhanceIdea(input: IdeaEnhanceInput, requestedByUserId: string): Promise<string> {
     const prompt = [
-      "사용자가 입력한 프로젝트 아이디어를 한국어 프로젝트 개요로 구체화하세요.",
-      "반드시 다음 항목을 포함하세요: 프로젝트 목적, 핵심 사용자, 주요 기능, 차별점, 예상 개발 범위.",
-      `요청 사용자 ID: ${requestedByUserId}`,
-      `프로젝트 이름: ${input.name}`,
+      "사용자가 입력한 아이디어를 300자 이상 400자 이하의 단일 문단으로만 더 구체화하세요.",
+      "출력은 오직 증강된 아이디어 본문만 포함하세요.",
+      "요청자, 프로젝트명, 프로젝트 유형, 기간 같은 메타데이터는 절대 포함하지 마세요.",
+      "이후 행동 추천, 추가 질문, 다음 단계 안내 문구도 포함하지 마세요.",
+      "마크다운 제목, 목록, 코드블록, 줄바꿈 없이 하나의 자연스러운 문단으로만 작성하세요.",
+      "원문 아이디어의 의미는 유지하되, 기능, 사용자 흐름, 핵심 가치, 실행 방향을 더 구체화하세요.",
+      `프로젝트명: ${input.name}`,
       `프로젝트 유형: ${input.type}`,
       `기간: ${input.startDate} ~ ${input.endDate}`,
       `원본 아이디어:\n${input.originalIdea}`
     ].join("\n\n");
 
-    return this.generateText(prompt);
+    const text = await this.generateText(prompt);
+    return text;
   }
-
   async generateInitialDocuments(input: ProjectCreateInput): Promise<GeneratedDocuments> {
     let featureSpec = FALLBACK_DOCUMENT_CONTENT;
     let apiSpec = FALLBACK_DOCUMENT_CONTENT;
@@ -121,12 +128,12 @@ export class AiService {
 
   async generateSchedule(input: AiScheduleGenerateInput): Promise<ScheduleItemInput[]> {
     const prompt = [
-      "다음 프로젝트와 팀원 정보를 바탕으로 프로젝트 일정을 생성하세요.",
+      "아래 프로젝트와 멤버 정보를 바탕으로 프로젝트 일정을 생성하세요.",
       "응답은 설명 없이 JSON 객체만 반환하세요.",
       "JSON 형식: {\"items\":[{\"title\":\"...\",\"type\":\"task|sprint|meeting\",\"description\":\"...\",\"assigneeUserIds\":[\"user-id\"],\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}]}",
       "모든 일정은 날짜 단위이며 프로젝트 시작일과 종료일 사이여야 합니다.",
-      "역할 분담, 스프린트 단위 작업 구성, 회의 일정을 포함하세요.",
-      "회의 시간이 충분히 겹치지 않으면 리더 가능 시간을 기준으로 가장 겹치는 날에 배정하세요.",
+      "개별 작업, 스프린트, 회의를 균형 있게 포함하세요.",
+      "회의 시간은 멤버들의 가용 시간을 최대한 반영하고, 불분명하면 리더가 가능한 시간으로 배정하세요.",
       `프로젝트:\n${JSON.stringify(input.project, null, 2)}`,
       `멤버:\n${JSON.stringify(input.members, null, 2)}`,
       `기능 명세서:\n${input.featureSpec}`
@@ -137,7 +144,7 @@ export class AiService {
 
   async editSchedule(input: AiScheduleEditInput): Promise<ScheduleItemInput[]> {
     const prompt = [
-      "다음 기존 프로젝트 일정을 사용자 요청에 맞게 수정하세요.",
+      "아래 기존 프로젝트 일정을 사용자의 요청에 맞게 수정하세요.",
       "응답은 설명 없이 JSON 객체만 반환하세요.",
       "JSON 형식: {\"items\":[{\"title\":\"...\",\"type\":\"task|sprint|meeting\",\"description\":\"...\",\"assigneeUserIds\":[\"user-id\"],\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}]}",
       "모든 일정은 날짜 단위이며 프로젝트 시작일과 종료일 사이여야 합니다.",
@@ -152,10 +159,10 @@ export class AiService {
 
   async editFeatureSpec(input: AiFeatureSpecEditInput): Promise<string> {
     const prompt = [
-      "다음 기존 기능 명세서를 사용자 요청에 맞게 수정하세요.",
-      "응답은 설명 없이 수정된 한국어 Markdown 기능 명세서 본문만 반환하세요.",
-      "각 기능은 기능명, 설명, 제약사항, 예외 처리를 포함해야 합니다.",
-      `수정된 본문은 저장 본문 기준 ${FEATURE_SPEC_MAX_LENGTH}자 이하로 간결하게 작성하세요.`,
+      "아래 기능 명세서를 사용자의 요청에 맞게 수정하세요.",
+      "응답은 설명 없이 수정된 Markdown 본문만 반환하세요.",
+      "각 기능은 기능명, 설명, 예외 처리, 확인 조건을 포함해야 합니다.",
+      `수정할 본문은 2000자 이하여야 합니다.`,
       `사용자 요청:\n${input.prompt}`,
       `프로젝트:\n${JSON.stringify(input.project, null, 2)}`,
       `현재 기능 명세서:\n${input.currentFeatureSpec}`
@@ -166,10 +173,9 @@ export class AiService {
 
   async editApiSpec(input: AiApiSpecEditInput): Promise<string> {
     const prompt = [
-      "다음 기존 API 명세서를 사용자 요청에 맞게 수정하세요.",
-      "응답은 설명 없이 수정된 한국어 Markdown API 명세서 본문만 반환하세요.",
-      "각 API는 API 이름, HTTP 메서드, 경로, 요청 데이터, 응답 데이터, 주요 오류 케이스를 포함하세요.",
-      "담당자는 배정하지 마세요.",
+      "아래 API 명세서를 사용자의 요청에 맞게 수정하세요.",
+      "응답은 설명 없이 수정된 Markdown 본문만 반환하세요.",
+      "각 API는 이름, 메서드, 경로, 요청 데이터, 응답 데이터, 주요 예외를 포함해야 합니다.",
       `사용자 요청:\n${input.prompt}`,
       `프로젝트:\n${JSON.stringify(input.project, null, 2)}`,
       `현재 API 명세서:\n${input.currentApiSpec}`,
@@ -182,10 +188,10 @@ export class AiService {
   private async generateFeatureSpec(input: ProjectCreateInput): Promise<string> {
     const idea = input.enhancedIdea || input.originalIdea;
     const prompt = [
-      "다음 프로젝트 정보를 바탕으로 기능 명세서 초안을 한국어 Markdown으로 작성하세요.",
-      "각 기능은 기능명, 설명, 제약사항, 예외 처리를 포함해야 합니다.",
-      "저장 본문 기준 2000자 이하로 간결하게 작성하세요.",
-      `프로젝트 이름: ${input.name}`,
+      "아래 프로젝트 정보를 바탕으로 기능 명세서를 Markdown으로 작성하세요.",
+      "각 기능은 기능명, 설명, 예외 처리, 확인 조건을 포함해야 합니다.",
+      "전체 본문은 2000자 이하여야 합니다.",
+      `프로젝트명: ${input.name}`,
       `프로젝트 유형: ${input.type}`,
       `기간: ${input.startDate} ~ ${input.endDate}`,
       `초대 이메일: ${input.inviteEmails.join(", ") || "없음"}`,
@@ -196,13 +202,17 @@ export class AiService {
   }
 
   private async generateApiSpec(input: ProjectCreateInput, featureSpec: string): Promise<string> {
+    const idea = input.enhancedIdea || input.originalIdea;
     const prompt = [
-      "다음 프로젝트 정보와 기능 명세서를 바탕으로 API 명세서 초안을 한국어 Markdown으로 작성하세요.",
-      "각 API는 API 이름, HTTP 메서드, 경로, 요청 데이터, 응답 데이터, 주요 오류 케이스를 포함하세요.",
-      "담당자는 배정하지 마세요.",
-      `프로젝트 이름: ${input.name}`,
+      "아래 프로젝트를 위한 API 명세서를 Markdown으로 작성하세요.",
+      "응답은 설명 없이 본문만 반환하세요.",
+      "구성은 다음 5개 섹션만 사용하세요: 인증, 프로젝트, 초대, 문서, 일정.",
+      "각 섹션에는 필요한 API만 1~3개씩 적으세요.",
+      "각 API에는 이름, 메서드, 경로, 요청, 응답, 예외만 간결하게 적으세요.",
+      "전체 분량은 기능 명세서보다 짧고, 불필요한 설명은 넣지 마세요.",
+      `프로젝트명: ${input.name}`,
       `프로젝트 유형: ${input.type}`,
-      `원본 아이디어:\n${input.originalIdea}`,
+      `아이디어:\n${idea}`,
       `기능 명세서:\n${featureSpec}`
     ].join("\n\n");
 
@@ -240,4 +250,7 @@ export class AiService {
 
     return text;
   }
+
 }
+
+

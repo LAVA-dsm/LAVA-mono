@@ -194,7 +194,7 @@ export const ideaEnhanceInputSchema = z
   .object({
     name: z.string().trim().min(1).max(PROJECT_NAME_MAX_LENGTH),
     type: projectTypeSchema,
-    originalIdea: z.string().min(PROJECT_IDEA_MIN_LENGTH),
+    originalIdea: z.string().trim().min(1, "아이디어를 입력해 주세요."),
     startDate: dateOnlySchema,
     endDate: dateOnlySchema
   })
