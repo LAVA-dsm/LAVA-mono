@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectDocumentSummary, ProjectDocumentType, ProjectSummary } from "@lava/shared";
 import { apiClient } from "@/lib/api-client";
 import { DocumentEditor } from "./document-editor";
+import { InvitationResponse } from "./invitation-response";
 import { ProjectDetail } from "./project-detail";
 
 const push = vi.fn();
@@ -20,6 +21,9 @@ vi.mock("@/lib/api-client", () => ({
     getProjectDocument: vi.fn(),
     updateProjectDocument: vi.fn(),
     editProjectDocumentWithAi: vi.fn(),
+    getInvitation: vi.fn(),
+    acceptInvitation: vi.fn(),
+    rejectInvitation: vi.fn(),
     updateMyParticipation: vi.fn(),
     generateSchedule: vi.fn(),
     updateSchedule: vi.fn(),
@@ -75,6 +79,26 @@ const project: ProjectSummary = {
   schedule: null
 };
 
+const projectWithSchedule: ProjectSummary = {
+  ...project,
+  schedule: {
+    id: "schedule-1",
+    generatedBy: "ai",
+    updatedAt: "2026-06-05T00:00:00.000Z",
+    items: [
+      {
+        id: "schedule-item-1",
+        title: "기능 구현",
+        type: "task",
+        description: "핵심 기능 구현",
+        assigneeUserIds: ["leader-1"],
+        startDate: "2026-06-05",
+        endDate: "2026-06-10"
+      }
+    ]
+  }
+};
+
 const mockedApiClient = vi.mocked(apiClient);
 
 describe("DocumentEditor", () => {
@@ -96,6 +120,40 @@ describe("DocumentEditor", () => {
       content: "# AI 수정 기능 명세서",
       generatedBy: "ai",
       updatedAt: "2026-06-04T00:00:00.000Z"
+    });
+    mockedApiClient.getInvitation.mockResolvedValue({
+      id: "invitation-1",
+      projectId: "project-1",
+      projectName: "LAVA",
+      email: "teammate@example.com",
+      status: "pending",
+      sentAt: "2026-06-01T00:00:00.000Z",
+      expiresAt: "2026-06-08T00:00:00.000Z"
+    });
+    mockedApiClient.acceptInvitation.mockResolvedValue(project);
+    mockedApiClient.rejectInvitation.mockResolvedValue({
+      id: "invitation-1",
+      projectId: "project-1",
+      projectName: "LAVA",
+      email: "teammate@example.com",
+      status: "rejected",
+      sentAt: "2026-06-01T00:00:00.000Z",
+      expiresAt: "2026-06-08T00:00:00.000Z"
+    });
+    mockedApiClient.updateSchedule.mockResolvedValue(projectWithSchedule.schedule!);
+    mockedApiClient.editScheduleWithAi.mockResolvedValue({
+      ...projectWithSchedule.schedule!,
+      items: [
+        {
+          id: "schedule-item-1",
+          title: "AI 조정 일정",
+          type: "task",
+          description: "핵심 기능 구현",
+          assigneeUserIds: ["leader-1"],
+          startDate: "2026-06-05",
+          endDate: "2026-06-10"
+        }
+      ]
     });
   });
 
@@ -147,5 +205,59 @@ describe("DocumentEditor", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("AI 문서 수정에 실패했어요.");
     expect(body).toHaveValue("# 기능 명세서");
+  });
+
+  it("saves direct schedule edits from the project detail screen", async () => {
+    mockedApiClient.getProject.mockResolvedValueOnce(projectWithSchedule);
+    const user = userEvent.setup();
+    render(<ProjectDetail projectId="project-1" />);
+
+    const titleInput = await screen.findByDisplayValue("기능 구현");
+    fireEvent.change(titleInput, { target: { value: "수정된 일정" } });
+    await user.click(screen.getByRole("button", { name: "일정 저장" }));
+
+    await waitFor(() =>
+      expect(mockedApiClient.updateSchedule).toHaveBeenCalledWith("project-1", {
+        items: [expect.objectContaining({ title: "수정된 일정" })]
+      })
+    );
+  });
+
+  it("blocks empty AI schedule edit requests and submits non-empty prompts", async () => {
+    mockedApiClient.getProject.mockResolvedValueOnce(projectWithSchedule);
+    const user = userEvent.setup();
+    render(<ProjectDetail projectId="project-1" />);
+
+    const aiEditButton = await screen.findByRole("button", { name: "AI로 일정 수정" });
+    expect(aiEditButton).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/AI 일정 수정 요청/), "회의 일정을 평일 저녁으로 조정해줘.");
+    expect(aiEditButton).not.toBeDisabled();
+    await user.click(aiEditButton);
+
+    await waitFor(() =>
+      expect(mockedApiClient.editScheduleWithAi).toHaveBeenCalledWith("project-1", {
+        prompt: "회의 일정을 평일 저녁으로 조정해줘."
+      })
+    );
+  });
+
+  it("accepts an invitation with participation info", async () => {
+    const user = userEvent.setup();
+    render(<InvitationResponse token="invite-token" />);
+
+    expect(await screen.findByText("LAVA")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/전공/), { target: { value: "컴퓨터공학" } });
+    fireEvent.change(screen.getByLabelText(/기술 스택/), { target: { value: "React, NestJS" } });
+    await user.click(screen.getByRole("button", { name: "초대 수락" }));
+
+    await waitFor(() =>
+      expect(mockedApiClient.acceptInvitation).toHaveBeenCalledWith("invite-token", {
+        major: "컴퓨터공학",
+        techStacks: ["React", "NestJS"],
+        availableTimes: [{ dayOfWeek: "mon", startTime: "19:00", endTime: "21:00" }]
+      })
+    );
+    expect(push).toHaveBeenCalledWith("/projects/project-1");
   });
 });

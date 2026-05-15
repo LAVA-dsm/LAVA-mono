@@ -431,6 +431,11 @@ function ScheduleSection({
   };
 
   const aiEdit = async () => {
+    if (!aiPrompt.trim()) {
+      setError("AI 일정 수정 요청을 입력해 주세요.");
+      return;
+    }
+
     setIsBusy(true);
     setError(null);
     try {
@@ -524,7 +529,7 @@ function ScheduleSection({
             <FieldWrapper label="AI 일정 수정 요청">
               <Textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="예: 회의 일정을 주말 대신 평일 저녁으로 조정해줘." />
             </FieldWrapper>
-            <Button type="button" className="mt-3" onClick={aiEdit} disabled={isBusy} icon={<Sparkles className="h-4 w-4" />}>
+            <Button type="button" className="mt-3" onClick={aiEdit} disabled={isBusy || !aiPrompt.trim()} icon={<Sparkles className="h-4 w-4" />}>
               AI로 일정 수정
             </Button>
           </div>

@@ -170,6 +170,18 @@ function createPrismaMock() {
           }
         }
         throw new Error("Invitation not found");
+      }),
+      updateMany: vi.fn(async ({ where, data }) => {
+        const ids = new Set<string>(where.id?.in ?? []);
+        let count = 0;
+        for (const project of projects.values()) {
+          for (const invitation of project.invitations) {
+            if (!ids.has(invitation.id)) continue;
+            Object.assign(invitation, data);
+            count += 1;
+          }
+        }
+        return { count };
       })
     },
     projectMember: {
@@ -338,7 +350,16 @@ describe("ProjectsController", () => {
           endDate: "2026-06-03"
         }
       ]),
-      editSchedule: vi.fn(async () => []),
+      editSchedule: vi.fn(async () => [
+        {
+          title: "AI 조정 일정",
+          type: "meeting",
+          description: "회의 일정 조정",
+          assigneeUserIds: ["leader-1"],
+          startDate: "2026-06-04",
+          endDate: "2026-06-04"
+        }
+      ]),
       editFeatureSpec: vi.fn(async () => "# 수정된 기능 명세서"),
       editApiSpec: vi.fn(async () => "# 수정된 API 명세서")
     };
@@ -377,6 +398,72 @@ describe("ProjectsController", () => {
     await app?.close();
   });
 
+  async function createPersonalProject() {
+    return request(app.getHttpServer())
+      .post("/projects")
+      .send({
+        name: "LAVA",
+        type: "personal",
+        originalIdea: longIdea,
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+        inviteEmails: []
+      })
+      .expect(201);
+  }
+
+  async function createReadyPersonalProject() {
+    const created = await createPersonalProject();
+
+    await request(app.getHttpServer())
+      .patch(`/projects/${created.body.id}/members/me/participation`)
+      .send({
+        major: "컴퓨터공학",
+        techStacks: ["NestJS"],
+        availableTimes: [{ dayOfWeek: "mon", startTime: "19:00", endTime: "21:00" }]
+      })
+      .expect(200);
+
+    return created;
+  }
+
+  async function createTeamProjectWithInvitation(token = "invite-token") {
+    const created = await request(app.getHttpServer())
+      .post("/projects")
+      .send({
+        name: "LAVA",
+        type: "team",
+        originalIdea: longIdea,
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+        inviteEmails: ["teammate@example.com"]
+      })
+      .expect(201);
+    const project = prismaMock.projects.get(created.body.id);
+    if (!project?.invitations[0]) throw new Error("Invitation was not created");
+    project.invitations[0].tokenHash = hashToken(token);
+
+    return { created, project, token };
+  }
+
+  async function acceptTeamInvitation(token = "invite-token") {
+    const context = await createTeamProjectWithInvitation(token);
+
+    await request(app.getHttpServer())
+      .post(`/invitations/${token}/accept`)
+      .set("x-test-user-id", "member-1")
+      .set("x-test-user-email", "teammate@example.com")
+      .set("x-test-user-name", "Invited Member")
+      .send({
+        major: "컴퓨터공학",
+        techStacks: ["React"],
+        availableTimes: [{ dayOfWeek: "mon", startTime: "19:00", endTime: "21:00" }]
+      })
+      .expect(201);
+
+    return context;
+  }
+
   it("creates a team project with pending invitation status", async () => {
     const response = await request(app.getHttpServer())
       .post("/projects")
@@ -393,6 +480,47 @@ describe("ProjectsController", () => {
     expect(response.body.inviteCount).toBe(1);
     expect(response.body.invitations[0]).toEqual(expect.objectContaining({ email: "teammate@example.com", status: "pending" }));
     expect(emailService.sendInvitation).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks expired invitations before returning a project summary", async () => {
+    const { created, project } = await createTeamProjectWithInvitation();
+    const invitation = project.invitations[0];
+    if (!invitation) throw new Error("Invitation was not created");
+    invitation.expiresAt = new Date("2000-01-01T00:00:00.000Z");
+
+    const response = await request(app.getHttpServer()).get(`/projects/${created.body.id}`).expect(200);
+
+    expect(response.body.inviteCount).toBe(0);
+    expect(response.body.invitations[0]).toEqual(expect.objectContaining({ status: "expired" }));
+    expect(prismaMock.prisma.projectInvitation.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: { in: [invitation.id] } },
+        data: { status: "expired" }
+      })
+    );
+  });
+
+  it("marks expired invitations before returning the leader invitation list", async () => {
+    const { created, project } = await createTeamProjectWithInvitation();
+    const invitation = project.invitations[0];
+    if (!invitation) throw new Error("Invitation was not created");
+    invitation.expiresAt = new Date("2000-01-01T00:00:00.000Z");
+
+    const response = await request(app.getHttpServer()).get(`/projects/${created.body.id}/invitations`).expect(200);
+
+    expect(response.body.invitations).toEqual([
+      expect.objectContaining({ email: "teammate@example.com", status: "expired" })
+    ]);
+  });
+
+  it("blocks invitation status lookup for non-leaders", async () => {
+    const { created } = await acceptTeamInvitation();
+
+    await request(app.getHttpServer())
+      .get(`/projects/${created.body.id}/invitations`)
+      .set("x-test-user-id", "member-1")
+      .set("x-test-user-email", "teammate@example.com")
+      .expect(403);
   });
 
   it("returns a generated feature spec for a project member", async () => {
@@ -536,6 +664,37 @@ describe("ProjectsController", () => {
     );
   });
 
+  it("allows any accepted member to update project documents", async () => {
+    const { created } = await acceptTeamInvitation();
+
+    const response = await request(app.getHttpServer())
+      .put(`/projects/${created.body.id}/documents/feature_spec`)
+      .set("x-test-user-id", "member-1")
+      .set("x-test-user-email", "teammate@example.com")
+      .send({ content: "# 멤버가 직접 수정한 기능 명세서" })
+      .expect(200);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        type: "feature_spec",
+        content: "# 멤버가 직접 수정한 기능 명세서",
+        generatedBy: "user"
+      })
+    );
+  });
+
+  it("does not apply the feature spec length limit to API specs", async () => {
+    const created = await createPersonalProject();
+    const longApiSpec = "가".repeat(3000);
+
+    const response = await request(app.getHttpServer())
+      .put(`/projects/${created.body.id}/documents/api_spec`)
+      .send({ content: longApiSpec })
+      .expect(200);
+
+    expect(response.body).toEqual(expect.objectContaining({ type: "api_spec", content: longApiSpec }));
+  });
+
   it("accepts an invitation only for the invited email", async () => {
     const created = await request(app.getHttpServer())
       .post("/projects")
@@ -570,6 +729,29 @@ describe("ProjectsController", () => {
       ])
     );
     expect(project.invitations[0].status).toBe("accepted");
+  });
+
+  it("rejects an invitation and blocks repeated handling", async () => {
+    const { token, project } = await createTeamProjectWithInvitation();
+    const invitation = project.invitations[0];
+    if (!invitation) throw new Error("Invitation was not created");
+
+    const response = await request(app.getHttpServer())
+      .post(`/invitations/${token}/reject`)
+      .set("x-test-user-id", "member-1")
+      .set("x-test-user-email", "teammate@example.com")
+      .send({})
+      .expect(201);
+
+    expect(response.body).toEqual(expect.objectContaining({ status: "rejected" }));
+    expect(invitation.status).toBe("rejected");
+
+    await request(app.getHttpServer())
+      .post(`/invitations/${token}/reject`)
+      .set("x-test-user-id", "member-1")
+      .set("x-test-user-email", "teammate@example.com")
+      .send({})
+      .expect(400);
   });
 
   it("blocks schedule generation until every accepted member has participation info", async () => {
@@ -614,6 +796,150 @@ describe("ProjectsController", () => {
 
     expect(response.body.items).toEqual(
       expect.arrayContaining([expect.objectContaining({ title: "기능 구현", type: "task" })])
+    );
+  });
+
+  it("returns a generated project schedule", async () => {
+    const created = await createReadyPersonalProject();
+
+    await request(app.getHttpServer()).post(`/projects/${created.body.id}/schedule/generate`).send({}).expect(201);
+
+    const response = await request(app.getHttpServer()).get(`/projects/${created.body.id}/schedule`).expect(200);
+
+    expect(response.body.items).toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: "기능 구현", type: "task" })])
+    );
+  });
+
+  it("updates a schedule directly for the project leader", async () => {
+    const created = await createReadyPersonalProject();
+
+    const response = await request(app.getHttpServer())
+      .put(`/projects/${created.body.id}/schedule`)
+      .send({
+        items: [
+          {
+            title: "직접 수정 일정",
+            type: "sprint",
+            description: "스프린트 단위 작업",
+            assigneeUserIds: ["leader-1"],
+            startDate: "2026-06-05",
+            endDate: "2026-06-10"
+          }
+        ]
+      })
+      .expect(200);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        generatedBy: "user",
+        items: [expect.objectContaining({ title: "직접 수정 일정", type: "sprint" })]
+      })
+    );
+  });
+
+  it("blocks schedule direct updates for non-leaders", async () => {
+    const { created } = await acceptTeamInvitation();
+
+    await request(app.getHttpServer())
+      .put(`/projects/${created.body.id}/schedule`)
+      .set("x-test-user-id", "member-1")
+      .set("x-test-user-email", "teammate@example.com")
+      .send({
+        items: [
+          {
+            title: "멤버 수정 일정",
+            type: "task",
+            description: "권한이 없는 수정",
+            assigneeUserIds: ["member-1"],
+            startDate: "2026-06-05",
+            endDate: "2026-06-10"
+          }
+        ]
+      })
+      .expect(403);
+  });
+
+  it("rejects schedule items outside the project date range", async () => {
+    const created = await createReadyPersonalProject();
+
+    await request(app.getHttpServer())
+      .put(`/projects/${created.body.id}/schedule`)
+      .send({
+        items: [
+          {
+            title: "범위 밖 일정",
+            type: "task",
+            description: "프로젝트 종료일 이후",
+            assigneeUserIds: ["leader-1"],
+            startDate: "2026-06-29",
+            endDate: "2026-07-01"
+          }
+        ]
+      })
+      .expect(400);
+  });
+
+  it("rejects schedule items assigned to non-members", async () => {
+    const created = await createReadyPersonalProject();
+
+    await request(app.getHttpServer())
+      .put(`/projects/${created.body.id}/schedule`)
+      .send({
+        items: [
+          {
+            title: "알 수 없는 담당자 일정",
+            type: "task",
+            description: "담당자 검증",
+            assigneeUserIds: ["unknown-user"],
+            startDate: "2026-06-05",
+            endDate: "2026-06-10"
+          }
+        ]
+      })
+      .expect(400);
+  });
+
+  it("edits a schedule with AI and stores request history", async () => {
+    const created = await createReadyPersonalProject();
+    await request(app.getHttpServer()).post(`/projects/${created.body.id}/schedule/generate`).send({}).expect(201);
+
+    const response = await request(app.getHttpServer())
+      .post(`/projects/${created.body.id}/schedule/ai-edit`)
+      .send({ prompt: "회의 일정을 하루 뒤로 조정해줘." })
+      .expect(201);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        generatedBy: "ai",
+        items: [expect.objectContaining({ title: "AI 조정 일정", type: "meeting" })]
+      })
+    );
+    expect(prismaMock.prisma.aiRequestHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ targetType: "schedule", status: "success" })
+      })
+    );
+  });
+
+  it("keeps the current schedule when AI schedule editing fails", async () => {
+    const created = await createReadyPersonalProject();
+    await request(app.getHttpServer()).post(`/projects/${created.body.id}/schedule/generate`).send({}).expect(201);
+    aiService.editSchedule.mockRejectedValueOnce(new Error("schedule boom"));
+
+    await request(app.getHttpServer())
+      .post(`/projects/${created.body.id}/schedule/ai-edit`)
+      .send({ prompt: "일정을 더 촘촘하게 조정해줘." })
+      .expect(503);
+
+    const project = prismaMock.projects.get(created.body.id);
+    expect(project?.schedule?.items).toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: "기능 구현" })])
+    );
+    expect(prismaMock.prisma.aiRequestHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ targetType: "schedule", status: "failed", resultSummary: "schedule boom" })
+      })
     );
   });
 });
