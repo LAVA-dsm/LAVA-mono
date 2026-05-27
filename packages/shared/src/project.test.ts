@@ -4,8 +4,13 @@ import {
   aiScheduleEditInputSchema,
   featureSpecContentSchema,
   loginInputSchema,
+  passwordChangeCompleteInputSchema,
+  passwordChangeVerifyInputSchema,
+  projectCalendarItemSchema,
   participationInputSchema,
   projectCreateInputSchema,
+  projectLeaveInputSchema,
+  projectListItemSchema,
   scheduleUpdateInputSchema,
   signupCompleteInputSchema,
   signupVerifyInputSchema
@@ -139,6 +144,23 @@ describe("auth schemas", () => {
 
     expect(result.email).toBe("user@example.com");
   });
+
+  it("accepts a password change verification code", () => {
+    const result = passwordChangeVerifyInputSchema.safeParse({
+      code: "123456"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects mismatched password change confirmation", () => {
+    const result = passwordChangeCompleteInputSchema.safeParse({
+      password: "Passw0rd!",
+      passwordConfirm: "Passw0rd?"
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("participationInputSchema", () => {
@@ -222,6 +244,48 @@ describe("scheduleUpdateInputSchema", () => {
     const result = scheduleUpdateInputSchema.safeParse({ items: [] });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("sprint 4 project schemas", () => {
+  it("accepts a project list item", () => {
+    const result = projectListItemSchema.safeParse({
+      id: "project-1",
+      name: "LAVA",
+      type: "team",
+      currentUserRole: "leader",
+      startDate: "2026-06-01",
+      endDate: "2026-06-30",
+      memberCount: 2,
+      pendingInvitationCount: 1,
+      documentCount: 2,
+      scheduleItemCount: 3,
+      updatedAt: "2026-06-01T00:00:00.000Z"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a calendar schedule item with project context", () => {
+    const result = projectCalendarItemSchema.safeParse({
+      id: "schedule-item-1",
+      projectId: "project-1",
+      projectName: "LAVA",
+      title: "기능 구현",
+      type: "task",
+      description: "핵심 기능 구현",
+      assigneeUserIds: ["user-1"],
+      startDate: "2026-06-01",
+      endDate: "2026-06-03"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("allows project leave without a new leader for regular members", () => {
+    const result = projectLeaveInputSchema.safeParse({});
+
+    expect(result.success).toBe(true);
   });
 });
 

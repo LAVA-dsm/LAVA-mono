@@ -10,8 +10,13 @@ import type {
   ProjectDocumentSummary,
   ProjectDocumentType,
   LoginInput,
+  PasswordChangeCompleteInput,
+  PasswordChangeVerifyInput,
   ParticipationInput,
+  ProjectCalendarItem,
   ProjectCreateInput,
+  ProjectLeaveInput,
+  ProjectListItem,
   ProjectScheduleSummary,
   ProjectSummary,
   ScheduleUpdateInput,
@@ -88,6 +93,24 @@ export const apiClient = {
       body: JSON.stringify({})
     });
   },
+  sendPasswordChangeEmail() {
+    return requestJson<{ sent: boolean; expiresAt: string }>("/auth/password-change/email", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  },
+  verifyPasswordChangeCode(input: PasswordChangeVerifyInput) {
+    return requestJson<{ verified: boolean }>("/auth/password-change/verify", {
+      method: "POST",
+      body: JSON.stringify(input)
+    });
+  },
+  completePasswordChange(input: PasswordChangeCompleteInput) {
+    return requestJson<{ changed: boolean }>("/auth/password-change/complete", {
+      method: "POST",
+      body: JSON.stringify(input)
+    });
+  },
   enhanceIdea(input: IdeaEnhanceInput) {
     return requestJson<{ enhancedIdea: string }>("/ai/ideas/enhance", {
       method: "POST",
@@ -100,10 +123,33 @@ export const apiClient = {
       body: JSON.stringify(input)
     });
   },
+  listProjects() {
+    return requestJson<{ projects: ProjectListItem[] }>("/projects", {
+      method: "GET",
+      cache: "no-store"
+    });
+  },
+  getCalendarItems() {
+    return requestJson<{ items: ProjectCalendarItem[] }>("/projects/calendar-items", {
+      method: "GET",
+      cache: "no-store"
+    });
+  },
   getProject(id: string) {
     return requestJson<ProjectSummary>(`/projects/${id}`, {
       method: "GET",
       cache: "no-store"
+    });
+  },
+  deleteProject(id: string) {
+    return requestJson<{ deleted: true }>(`/projects/${id}`, {
+      method: "DELETE"
+    });
+  },
+  leaveProject(id: string, input: ProjectLeaveInput) {
+    return requestJson<{ left: true; newLeaderUserId?: string }>(`/projects/${id}/leave`, {
+      method: "POST",
+      body: JSON.stringify(input)
     });
   },
   getProjectDocument(id: string, type: ProjectDocumentType) {

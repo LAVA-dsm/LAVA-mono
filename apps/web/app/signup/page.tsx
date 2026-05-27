@@ -13,7 +13,7 @@ type SignupStep = "email" | "verify" | "profile";
 
 export default function SignupPage() {
   const router = useRouter();
-  const [next, setNext] = useState("/projects/new");
+  const [next, setNext] = useState("/");
   const [step, setStep] = useState<SignupStep>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -25,7 +25,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setNext(params.get("next") || "/projects/new");
+    setNext(params.get("next") || "/");
   }, []);
 
   const sendCode = async () => {

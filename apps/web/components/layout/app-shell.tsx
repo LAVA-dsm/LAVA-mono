@@ -9,18 +9,63 @@ import {
   Sparkles
 } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { AuthUser } from "@lava/shared";
+import { apiClient } from "@/lib/api-client";
 import { LogoutButton } from "./logout-button";
 
-const navItems = [
-  { label: "대시보드", icon: Home, href: "#" },
-  { label: "내 프로젝트", icon: FolderOpen, href: "/projects/new", active: true },
-  { label: "AI 어시스턴트", icon: Bot, href: "#" },
-  { label: "캘린더", icon: CalendarDays, href: "#" },
-  { label: "설정", icon: Settings, href: "#" }
+type ActiveNav = "dashboard" | "projects" | "calendar" | "settings" | "assistant";
+
+const navItems: Array<{ id: ActiveNav; label: string; icon: typeof Home; href: string }> = [
+  { id: "dashboard", label: "대시보드", icon: Home, href: "/" },
+  { id: "projects", label: "내 프로젝트", icon: FolderOpen, href: "/#projects" },
+  { id: "assistant", label: "AI 어시스턴트", icon: Bot, href: "/projects/new" },
+  { id: "calendar", label: "캘린더", icon: CalendarDays, href: "/#calendar" },
+  { id: "settings", label: "설정", icon: Settings, href: "/settings" }
 ];
 
-export function AppShell({ title, children }: { title: ReactNode; children: ReactNode }) {
+export function AppShell({
+  title,
+  activeNav,
+  children
+}: {
+  title: ReactNode;
+  activeNav?: ActiveNav;
+  children: ReactNode;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    apiClient
+      .me()
+      .then((response) => {
+        if (mounted) setUser(response.user);
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("로그인이 필요")) {
+          const next = typeof window === "undefined" ? pathname : `${window.location.pathname}${window.location.search}`;
+          router.push(`/login?next=${encodeURIComponent(next)}`);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [pathname, router]);
+
+  const resolvedActiveNav = useMemo<ActiveNav>(() => {
+    if (activeNav) return activeNav;
+    if (pathname.startsWith("/settings")) return "settings";
+    if (pathname === "/") return "dashboard";
+    return "projects";
+  }, [activeNav, pathname]);
+
   return (
     <div className="min-h-screen bg-lava-app pl-[260px]">
       <aside className="fixed left-0 top-0 flex h-screen w-[260px] flex-col border-r border-lava-border bg-white">
@@ -32,12 +77,13 @@ export function AppShell({ title, children }: { title: ReactNode; children: Reac
         <nav className="mt-10 space-y-3 px-5">
           {navItems.map((item) => {
             const Icon = item.icon;
+            const active = item.id === resolvedActiveNav;
             return (
               <Link
                 key={item.label}
                 href={item.href}
                 className={`flex h-12 items-center gap-3 rounded-lg px-4 text-sm font-semibold ${
-                  item.active
+                  active
                     ? "bg-brand-warmBg text-brand-primary"
                     : "text-lava-text hover:bg-lava-app"
                 }`}
@@ -51,11 +97,11 @@ export function AppShell({ title, children }: { title: ReactNode; children: Reac
         <div className="mt-auto p-5">
           <div className="flex items-center gap-3 rounded-lg bg-lava-app p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lava-border text-xs text-lava-muted">
-              Dev
+              {user?.name.slice(0, 2) || "사용"}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-lava-text">개발용 리더</p>
-              <p className="truncate text-xs text-lava-secondary">dev-leader@lava.local</p>
+              <p className="truncate text-sm font-bold text-lava-text">{user?.name || "사용자"}</p>
+              <p className="truncate text-xs text-lava-secondary">{user?.email || "로그인 확인 중"}</p>
             </div>
             <LogoutButton />
           </div>

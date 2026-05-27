@@ -9,6 +9,7 @@ export const PROJECT_MAX_DURATION_DAYS = 365;
 export const INVITATION_EXPIRES_DAYS = 7;
 export const EMAIL_CODE_EXPIRES_MINUTES = 5;
 export const EMAIL_VERIFY_MAX_ATTEMPTS = 5;
+export const EMAIL_RESEND_INTERVAL_SECONDS = 60;
 export const FEATURE_SPEC_MAX_LENGTH = 2000;
 
 export const projectTypeSchema = z.enum(["personal", "team"]);
@@ -83,6 +84,27 @@ export const authUserSchema = z.object({
   name: z.string()
 });
 export type AuthUser = z.infer<typeof authUserSchema>;
+
+export const passwordChangeVerifyInputSchema = z.object({
+  code: verificationCodeSchema
+});
+export type PasswordChangeVerifyInput = z.infer<typeof passwordChangeVerifyInputSchema>;
+
+export const passwordChangeCompleteInputSchema = z
+  .object({
+    password: passwordSchema,
+    passwordConfirm: z.string()
+  })
+  .superRefine((value, ctx) => {
+    if (value.password !== value.passwordConfirm) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["passwordConfirm"],
+        message: "비밀번호 확인 값이 일치하지 않습니다."
+      });
+    }
+  });
+export type PasswordChangeCompleteInput = z.infer<typeof passwordChangeCompleteInputSchema>;
 
 export const dateOnlySchema = z
   .string()
@@ -292,6 +314,32 @@ export const projectScheduleSummarySchema = z.object({
   items: z.array(scheduleItemSummarySchema)
 });
 export type ProjectScheduleSummary = z.infer<typeof projectScheduleSummarySchema>;
+
+export const projectListItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: projectTypeSchema,
+  currentUserRole: memberRoleSchema,
+  startDate: z.string(),
+  endDate: z.string(),
+  memberCount: z.number(),
+  pendingInvitationCount: z.number(),
+  documentCount: z.number(),
+  scheduleItemCount: z.number(),
+  updatedAt: z.string()
+});
+export type ProjectListItem = z.infer<typeof projectListItemSchema>;
+
+export const projectCalendarItemSchema = scheduleItemSummarySchema.extend({
+  projectId: z.string(),
+  projectName: z.string()
+});
+export type ProjectCalendarItem = z.infer<typeof projectCalendarItemSchema>;
+
+export const projectLeaveInputSchema = z.object({
+  newLeaderUserId: z.string().trim().min(1).optional()
+});
+export type ProjectLeaveInput = z.infer<typeof projectLeaveInputSchema>;
 
 export const projectSummarySchema = z.object({
   id: z.string(),

@@ -3,10 +3,14 @@ import type { Response } from "express";
 import {
   authEmailInputSchema,
   loginInputSchema,
+  passwordChangeCompleteInputSchema,
+  passwordChangeVerifyInputSchema,
   signupCompleteInputSchema,
   signupVerifyInputSchema,
   type AuthEmailInput,
   type LoginInput,
+  type PasswordChangeCompleteInput,
+  type PasswordChangeVerifyInput,
   type SignupCompleteInput,
   type SignupVerifyInput
 } from "@lava/shared";
@@ -54,6 +58,30 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUserParam() user: CurrentUser) {
     return { user };
+  }
+
+  @Post("password-change/email")
+  @UseGuards(JwtAuthGuard)
+  sendPasswordChangeEmail(@CurrentUserParam() user: CurrentUser) {
+    return this.authService.sendPasswordChangeEmail(user);
+  }
+
+  @Post("password-change/verify")
+  @UseGuards(JwtAuthGuard)
+  verifyPasswordChangeCode(
+    @CurrentUserParam() user: CurrentUser,
+    @Body(new ZodValidationPipe(passwordChangeVerifyInputSchema)) body: PasswordChangeVerifyInput
+  ) {
+    return this.authService.verifyPasswordChangeCode(body, user);
+  }
+
+  @Post("password-change/complete")
+  @UseGuards(JwtAuthGuard)
+  completePasswordChange(
+    @CurrentUserParam() user: CurrentUser,
+    @Body(new ZodValidationPipe(passwordChangeCompleteInputSchema)) body: PasswordChangeCompleteInput
+  ) {
+    return this.authService.completePasswordChange(body, user);
   }
 
   @Post("logout")

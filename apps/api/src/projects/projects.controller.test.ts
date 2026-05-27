@@ -63,7 +63,9 @@ type MockProject = {
   ideaEnhancementUsed: boolean;
   startDate: Date;
   endDate: Date;
-  status: "active";
+  status: "active" | "deleted";
+  createdAt: Date;
+  updatedAt: Date;
   members: MockMember[];
   invitations: MockInvitation[];
   documents: Array<{
@@ -119,6 +121,8 @@ function createPrismaMock() {
           startDate: data.startDate,
           endDate: data.endDate,
           status: "active",
+          createdAt: new Date("2026-06-01T00:00:00.000Z"),
+          updatedAt: new Date(`2026-06-${String(projectCounter).padStart(2, "0")}T00:00:00.000Z`),
           members: [
             {
               id: `member-${memberCounter}`,
@@ -151,7 +155,23 @@ function createPrismaMock() {
         projects.set(project.id, project);
         return project;
       }),
-      findUnique: vi.fn(async ({ where }) => projects.get(where.id) ?? null)
+      findUnique: vi.fn(async ({ where }) => projects.get(where.id) ?? null),
+      findMany: vi.fn(async ({ where }) => {
+        const userId = where.members?.some?.userId;
+        const memberStatus = where.members?.some?.status;
+        return Array.from(projects.values())
+          .filter((project) => project.status === where.status)
+          .filter((project) =>
+            project.members.some((member) => member.userId === userId && member.status === memberStatus)
+          )
+          .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      }),
+      update: vi.fn(async ({ where, data }) => {
+        const project = projects.get(where.id);
+        if (!project) throw new Error("Project not found");
+        Object.assign(project, data, { updatedAt: new Date("2026-06-05T00:00:00.000Z") });
+        return project;
+      })
     },
     projectInvitation: {
       findFirst: vi.fn(async ({ where }) => {
@@ -941,5 +961,91 @@ describe("ProjectsController", () => {
         data: expect.objectContaining({ targetType: "schedule", status: "failed", resultSummary: "schedule boom" })
       })
     );
+  });
+
+  it("lists only active accepted projects for the current user", async () => {
+    const active = await createPersonalProject();
+    const left = await createPersonalProject();
+    const deleted = await createPersonalProject();
+
+    const leftProject = prismaMock.projects.get(left.body.id);
+    const deletedProject = prismaMock.projects.get(deleted.body.id);
+    if (!leftProject || !deletedProject) throw new Error("Projects were not created");
+    leftProject.members[0]!.status = "left";
+    deletedProject.status = "deleted";
+
+    const response = await request(app.getHttpServer()).get("/projects").expect(200);
+
+    expect(response.body.projects).toEqual([
+      expect.objectContaining({ id: active.body.id, name: "LAVA", currentUserRole: "leader" })
+    ]);
+  });
+
+  it("returns calendar items across the current user's projects", async () => {
+    const created = await createReadyPersonalProject();
+    await request(app.getHttpServer()).post(`/projects/${created.body.id}/schedule/generate`).send({}).expect(201);
+
+    const response = await request(app.getHttpServer()).get("/projects/calendar-items").expect(200);
+
+    expect(response.body.items).toEqual([
+      expect.objectContaining({
+        projectId: created.body.id,
+        projectName: "LAVA",
+        title: "기능 구현",
+        type: "task"
+      })
+    ]);
+  });
+
+  it("soft deletes a project for the project leader", async () => {
+    const created = await createPersonalProject();
+
+    await request(app.getHttpServer()).delete(`/projects/${created.body.id}`).expect(200);
+
+    expect(prismaMock.projects.get(created.body.id)?.status).toBe("deleted");
+    await request(app.getHttpServer()).get(`/projects/${created.body.id}`).expect(404);
+  });
+
+  it("blocks project deletion for non-leaders", async () => {
+    const { created } = await acceptTeamInvitation();
+
+    await request(app.getHttpServer())
+      .delete(`/projects/${created.body.id}`)
+      .set("x-test-user-id", "member-1")
+      .set("x-test-user-email", "teammate@example.com")
+      .expect(403);
+  });
+
+  it("lets a regular member leave a project", async () => {
+    const { created, project } = await acceptTeamInvitation();
+
+    await request(app.getHttpServer())
+      .post(`/projects/${created.body.id}/leave`)
+      .set("x-test-user-id", "member-1")
+      .set("x-test-user-email", "teammate@example.com")
+      .send({})
+      .expect(201);
+
+    expect(project.members.find((member) => member.userId === "member-1")?.status).toBe("left");
+  });
+
+  it("requires a new leader when the current leader leaves", async () => {
+    const { created } = await acceptTeamInvitation();
+
+    await request(app.getHttpServer()).post(`/projects/${created.body.id}/leave`).send({}).expect(400);
+  });
+
+  it("delegates leadership before the leader leaves a project", async () => {
+    const { created, project } = await acceptTeamInvitation();
+
+    const response = await request(app.getHttpServer())
+      .post(`/projects/${created.body.id}/leave`)
+      .send({ newLeaderUserId: "member-1" })
+      .expect(201);
+
+    expect(response.body).toEqual({ left: true, newLeaderUserId: "member-1" });
+    expect(project.leaderUserId).toBe("member-1");
+    expect(project.members.find((member) => member.userId === "member-1")?.role).toBe("leader");
+    expect(project.members.find((member) => member.userId === "leader-1")?.status).toBe("left");
   });
 });

@@ -19,9 +19,12 @@ import {
   type InvitationDetail,
   type InvitationSummary,
   type ParticipationInput,
+  type ProjectCalendarItem,
   type ProjectCreateInput,
   type ProjectDocumentSummary,
   type ProjectDocumentType,
+  type ProjectLeaveInput,
+  type ProjectListItem,
   type ProjectMemberSummary,
   type ProjectScheduleSummary,
   type ProjectSummary,
@@ -41,6 +44,7 @@ type InvitationDraft = {
 };
 
 type ProjectForSummary = NonNullable<Awaited<ReturnType<ProjectsService["findProjectForSummary"]>>>;
+type ProjectForList = Awaited<ReturnType<ProjectsService["findProjectsForUser"]>>[number];
 type InvitationForDetail = NonNullable<Awaited<ReturnType<ProjectsService["findInvitationByToken"]>>>;
 
 @Injectable()
@@ -154,10 +158,117 @@ export class ProjectsService {
     return this.getProject(project.id, user);
   }
 
+  async listProjects(user: CurrentUser): Promise<{ projects: ProjectListItem[] }> {
+    const projects = await this.findProjectsForUser(user.id);
+    return {
+      projects: projects.map((project) => this.toProjectListItem(project, user.id))
+    };
+  }
+
+  async getCalendarItems(user: CurrentUser): Promise<{ items: ProjectCalendarItem[] }> {
+    const projects = await this.findProjectsForUser(user.id);
+    return {
+      items: projects.flatMap((project) =>
+        project.schedule?.items.map((item) => ({
+          ...this.toScheduleItemSummary(item),
+          projectId: project.id,
+          projectName: project.name
+        })) ?? []
+      )
+    };
+  }
+
   async getProject(projectId: string, user: CurrentUser): Promise<ProjectSummary> {
     const project = await this.refreshExpiredProjectInvitations(await this.findProjectForSummary(projectId));
     this.assertProjectAccess(project, user);
     return this.toProjectSummary(project, user);
+  }
+
+  async deleteProject(projectId: string, user: CurrentUser): Promise<{ deleted: true }> {
+    const project = await this.findProjectForSummary(projectId);
+    this.assertLeader(project, user);
+
+    await this.prisma.project.update({
+      where: { id: project.id },
+      data: { status: "deleted" }
+    });
+
+    return { deleted: true };
+  }
+
+  async leaveProject(
+    projectId: string,
+    input: ProjectLeaveInput,
+    user: CurrentUser
+  ): Promise<{ left: true; newLeaderUserId?: string }> {
+    const project = await this.findProjectForSummary(projectId);
+    const membership = project.members.find((member) => member.userId === user.id && member.status === "accepted");
+
+    if (!membership) {
+      throw new ForbiddenException("프로젝트 탈퇴 권한이 없습니다.");
+    }
+
+    if (membership.role !== "leader") {
+      await this.prisma.projectMember.update({
+        where: {
+          projectId_userId: {
+            projectId: project.id,
+            userId: user.id
+          }
+        },
+        data: {
+          status: "left"
+        }
+      });
+
+      return { left: true };
+    }
+
+    const newLeaderUserId = input.newLeaderUserId;
+    if (!newLeaderUserId || newLeaderUserId === user.id) {
+      throw new BadRequestException("리더는 탈퇴 전 새 리더를 선택해야 합니다.");
+    }
+
+    const newLeader = project.members.find(
+      (member) => member.userId === newLeaderUserId && member.status === "accepted"
+    );
+    if (!newLeader) {
+      throw new BadRequestException("새 리더는 참여 중인 프로젝트 멤버여야 합니다.");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: project.id },
+        data: { leaderUserId: newLeaderUserId }
+      });
+
+      await tx.projectMember.update({
+        where: {
+          projectId_userId: {
+            projectId: project.id,
+            userId: newLeaderUserId
+          }
+        },
+        data: {
+          role: "leader"
+        }
+      });
+
+      await tx.projectMember.update({
+        where: {
+          projectId_userId: {
+            projectId: project.id,
+            userId: user.id
+          }
+        },
+        data: {
+          role: "member",
+          status: "left"
+        }
+      });
+    });
+
+    return { left: true, newLeaderUserId };
   }
 
   async getProjectInvitations(projectId: string, user: CurrentUser): Promise<{ invitations: InvitationSummary[] }> {
@@ -720,6 +831,40 @@ export class ProjectsService {
     return project;
   }
 
+  async findProjectsForUser(userId: string) {
+    return this.prisma.project.findMany({
+      where: {
+        status: "active",
+        members: {
+          some: {
+            userId,
+            status: "accepted"
+          }
+        }
+      },
+      include: {
+        members: {
+          include: {
+            user: true
+          },
+          orderBy: [{ role: "asc" }, { joinedAt: "asc" }]
+        },
+        invitations: {
+          orderBy: { sentAt: "asc" }
+        },
+        documents: true,
+        schedule: {
+          include: {
+            items: {
+              orderBy: [{ startDate: "asc" }, { endDate: "asc" }]
+            }
+          }
+        }
+      },
+      orderBy: { updatedAt: "desc" }
+    });
+  }
+
   async findInvitationByToken(token: string) {
     const tokenHash = this.hashInvitationToken(token);
     const invitation = await this.prisma.projectInvitation.findFirst({
@@ -755,6 +900,27 @@ export class ProjectsService {
       members: project.members.map((member) => this.toMemberSummary(member)),
       invitations: project.invitations.map((invitation) => this.toInvitationSummary(invitation)),
       schedule: project.schedule ? this.toScheduleSummary(project.schedule) : null
+    };
+  }
+
+  private toProjectListItem(project: ProjectForList, userId: string): ProjectListItem {
+    const currentMembership = project.members.find((member) => member.userId === userId && member.status === "accepted");
+    if (!currentMembership) {
+      throw new ForbiddenException("프로젝트 접근 권한이 없습니다.");
+    }
+
+    return {
+      id: project.id,
+      name: project.name,
+      type: project.type,
+      currentUserRole: currentMembership.role,
+      startDate: this.toDateOnly(project.startDate),
+      endDate: this.toDateOnly(project.endDate),
+      memberCount: project.members.filter((member) => member.status === "accepted").length,
+      pendingInvitationCount: project.invitations.filter((invitation) => invitation.status === "pending").length,
+      documentCount: project.documents.length,
+      scheduleItemCount: project.schedule?.items.length ?? 0,
+      updatedAt: project.updatedAt.toISOString()
     };
   }
 
