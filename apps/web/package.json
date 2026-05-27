@@ -11,6 +11,9 @@
     "lint": "pnpm typecheck"
   },
   "dependencies": {
+    "@fullcalendar/core": "^6.1.20",
+    "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/react": "^6.1.20",
     "@lava/shared": "workspace:*",
     "lucide-react": "^0.468.0",
     "next": "^15.0.0",
@@ -22,9 +25,9 @@
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.5.0",
-    "@vitejs/plugin-react": "^5.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.0",
     "jsdom": "^27.0.0",
     "postcss": "^8.4.0",

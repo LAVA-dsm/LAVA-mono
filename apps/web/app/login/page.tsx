@@ -11,7 +11,7 @@ import { FieldWrapper, Input } from "@/components/ui/field";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [next, setNext] = useState("/projects/new");
+  const [next, setNext] = useState("/");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +19,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setNext(params.get("next") || "/projects/new");
+    setNext(params.get("next") || "/");
   }, []);
 
   const submit = async () => {

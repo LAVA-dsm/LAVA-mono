@@ -12,7 +12,8 @@ const push = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push
-  })
+  }),
+  usePathname: () => "/projects/project-1"
 }));
 
 vi.mock("@/lib/api-client", () => ({
@@ -28,6 +29,9 @@ vi.mock("@/lib/api-client", () => ({
     generateSchedule: vi.fn(),
     updateSchedule: vi.fn(),
     editScheduleWithAi: vi.fn(),
+    deleteProject: vi.fn(),
+    leaveProject: vi.fn(),
+    me: vi.fn(),
     logout: vi.fn()
   }
 }));
@@ -104,6 +108,7 @@ const mockedApiClient = vi.mocked(apiClient);
 describe("DocumentEditor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedApiClient.me.mockResolvedValue({ user: { id: "leader-1", email: "leader@example.com", name: "리더" } });
     mockedApiClient.getProject.mockResolvedValue(project);
     mockedApiClient.getProjectDocument.mockImplementation(async (_id: string, type: ProjectDocumentType) =>
       type === "feature_spec" ? featureDocument : apiDocument

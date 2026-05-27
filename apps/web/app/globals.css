@@ -33,3 +33,46 @@ select:focus-visible {
   outline: 2px solid #ff5a2d;
   outline-offset: 2px;
 }
+
+.lava-calendar .fc {
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.lava-calendar .fc-toolbar-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2f2f33;
+}
+
+.lava-calendar .fc-button {
+  border: 1px solid #d8dce2;
+  background: #ffffff;
+  color: #2f2f33;
+  box-shadow: none;
+}
+
+.lava-calendar .fc-button:hover,
+.lava-calendar .fc-button:focus {
+  border-color: #ff5a2d;
+  background: #fff1ec;
+  color: #ff5a2d;
+}
+
+.lava-calendar .fc-button-primary:not(:disabled).fc-button-active,
+.lava-calendar .fc-button-primary:not(:disabled):active {
+  border-color: #ff5a2d;
+  background: #ff5a2d;
+  color: #ffffff;
+}
+
+.lava-calendar .fc-theme-standard td,
+.lava-calendar .fc-theme-standard th,
+.lava-calendar .fc-theme-standard .fc-scrollgrid {
+  border-color: #e5e7eb;
+}
+
+.lava-calendar .fc-daygrid-day-number,
+.lava-calendar .fc-col-header-cell-cushion {
+  color: #2f2f33;
+}

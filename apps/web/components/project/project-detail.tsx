@@ -11,6 +11,7 @@ import {
   FileText,
   ListChecks,
   Loader2,
+  LogOut,
   Plus,
   Save,
   Sparkles,
@@ -153,6 +154,7 @@ function ProjectContent({
         <div className="space-y-6">
           <ParticipationSection project={project} onProjectChange={onProjectChange} />
           {isLeader ? <InvitationStatusSection project={project} /> : null}
+          <ProjectManagementSection project={project} />
         </div>
       </section>
     </>
@@ -371,6 +373,139 @@ function InvitationStatusSection({ project }: { project: ProjectSummary }) {
         ) : (
           <p className="text-sm text-lava-secondary">초대된 멤버가 없습니다.</p>
         )}
+      </div>
+    </Card>
+  );
+}
+
+function ProjectManagementSection({ project }: { project: ProjectSummary }) {
+  const router = useRouter();
+  const isLeader = project.currentUserRole === "leader";
+  const newLeaderCandidates = project.members.filter(
+    (member) => member.status === "accepted" && member.userId !== project.currentUserId
+  );
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [newLeaderUserId, setNewLeaderUserId] = useState(newLeaderCandidates[0]?.userId || "");
+  const [error, setError] = useState<string | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+
+  const deleteProject = async () => {
+    setIsBusy(true);
+    setError(null);
+    try {
+      await apiClient.deleteProject(project.id);
+      router.push("/");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "프로젝트 삭제에 실패했어요.");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const leaveProject = async () => {
+    setIsBusy(true);
+    setError(null);
+    try {
+      await apiClient.leaveProject(project.id, isLeader ? { newLeaderUserId } : {});
+      router.push("/");
+    } catch (leaveError) {
+      setError(leaveError instanceof Error ? leaveError.message : "프로젝트 탈퇴에 실패했어요.");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <h2 className="text-[18px] font-bold leading-[26px] text-lava-text">프로젝트 관리</h2>
+      <p className="mt-2 text-sm leading-6 text-lava-secondary">
+        삭제와 탈퇴는 프로젝트 접근 권한에 바로 영향을 줍니다.
+      </p>
+
+      {error ? <p className="mt-4 text-sm font-semibold text-brand-red">{error}</p> : null}
+
+      <div className="mt-5 space-y-4">
+        <div className="rounded-lg border border-lava-border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-lava-text">프로젝트 나가기</p>
+              <p className="mt-1 text-xs leading-5 text-lava-secondary">
+                {isLeader ? "새 리더를 지정한 뒤 나갈 수 있습니다." : "나가면 내 프로젝트 목록에서 사라집니다."}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              className="text-brand-red"
+              onClick={() => setShowLeaveConfirm((current) => !current)}
+              icon={<LogOut className="h-4 w-4" aria-hidden />}
+            >
+              나가기
+            </Button>
+          </div>
+
+          {showLeaveConfirm ? (
+            <div className="mt-4 space-y-3 border-t border-lava-border pt-4">
+              {isLeader ? (
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-lava-text">새 리더</label>
+                  <select
+                    className="h-11 w-full rounded-md border border-lava-borderStrong bg-white px-3 text-sm text-lava-text"
+                    value={newLeaderUserId}
+                    onChange={(event) => setNewLeaderUserId(event.target.value)}
+                  >
+                    {newLeaderCandidates.map((member) => (
+                      <option key={member.userId} value={member.userId}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                  </select>
+                  {!newLeaderCandidates.length ? (
+                    <p className="mt-2 text-xs font-semibold text-brand-red">
+                      참여 중인 다른 멤버가 없어 리더 탈퇴를 진행할 수 없습니다.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              <Button
+                type="button"
+                variant="danger"
+                onClick={leaveProject}
+                disabled={isBusy || (isLeader && !newLeaderUserId)}
+              >
+                {isBusy ? "처리 중" : "프로젝트 나가기 확인"}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+
+        {isLeader ? (
+          <div className="rounded-lg border border-red-100 bg-red-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-brand-red">프로젝트 삭제</p>
+                <p className="mt-1 text-xs leading-5 text-brand-red">삭제한 프로젝트는 목록과 상세 화면에서 더 이상 열 수 없습니다.</p>
+              </div>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => setShowDeleteConfirm((current) => !current)}
+                icon={<Trash2 className="h-4 w-4" aria-hidden />}
+              >
+                삭제
+              </Button>
+            </div>
+            {showDeleteConfirm ? (
+              <div className="mt-4 border-t border-red-100 pt-4">
+                <p className="mb-3 text-sm font-semibold text-brand-red">프로젝트를 삭제할까요?</p>
+                <Button type="button" variant="danger" onClick={deleteProject} disabled={isBusy}>
+                  {isBusy ? "삭제 중" : "프로젝트 삭제 확인"}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </Card>
   );

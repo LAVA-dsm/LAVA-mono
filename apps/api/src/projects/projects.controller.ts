@@ -1,16 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from "@nestjs/common";
 import {
   aiDocumentEditInputSchema,
   aiScheduleEditInputSchema,
   documentUpdateInputSchema,
   participationInputSchema,
   projectCreateInputSchema,
+  projectLeaveInputSchema,
   scheduleUpdateInputSchema,
   type AiDocumentEditInput,
   type AiScheduleEditInput,
   type DocumentUpdateInput,
   type ParticipationInput,
   type ProjectCreateInput,
+  type ProjectLeaveInput,
   type ScheduleUpdateInput
 } from "@lava/shared";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -32,9 +34,33 @@ export class ProjectsController {
     return this.projectsService.createProject(body, user);
   }
 
+  @Get()
+  listProjects(@CurrentUserParam() user: CurrentUser) {
+    return this.projectsService.listProjects(user);
+  }
+
+  @Get("calendar-items")
+  getCalendarItems(@CurrentUserParam() user: CurrentUser) {
+    return this.projectsService.getCalendarItems(user);
+  }
+
   @Get(":id")
   getProject(@CurrentUserParam() user: CurrentUser, @Param("id") id: string) {
     return this.projectsService.getProject(id, user);
+  }
+
+  @Delete(":id")
+  deleteProject(@CurrentUserParam() user: CurrentUser, @Param("id") id: string) {
+    return this.projectsService.deleteProject(id, user);
+  }
+
+  @Post(":id/leave")
+  leaveProject(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(projectLeaveInputSchema)) body: ProjectLeaveInput
+  ) {
+    return this.projectsService.leaveProject(id, body, user);
   }
 
   @Get(":id/invitations")
