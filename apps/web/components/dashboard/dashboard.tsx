@@ -21,6 +21,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { apiClient } from "@/lib/api-client";
 
 const projectColors = ["#FF5A2D", "#7B61FF", "#5865F2", "#35B85A", "#F5A400", "#E6002D"];
@@ -31,6 +32,7 @@ export function Dashboard() {
   const [calendarItems, setCalendarItems] = useState<ProjectCalendarItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -56,7 +58,7 @@ export function Dashboard() {
     };
 
     void load();
-  }, [router]);
+  }, [router, retryTrigger]);
 
   const events = useMemo<EventInput[]>(
     () =>
@@ -87,7 +89,6 @@ export function Dashboard() {
           <h1 className="text-xl font-bold text-lava-text">대시보드</h1>
         </div>
       }
-      activeNav="dashboard"
     >
       <div className="mx-auto max-w-[1580px]">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -103,13 +104,26 @@ export function Dashboard() {
         </div>
 
         {error ? (
-          <div role="alert" className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-brand-red">
-            {error}
-          </div>
+          <ErrorAlert
+            message={error}
+            onRetry={() => setRetryTrigger((prev) => prev + 1)}
+          />
         ) : null}
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <MetricCard icon={<FolderOpen className="h-5 w-5" aria-hidden />} label="참여 프로젝트" value={projects.length} />
+          <MetricCard
+            icon={<FolderOpen className="h-5 w-5" aria-hidden />}
+            label="참여 프로젝트"
+            value={projects.length}
+            onClick={() => {
+              const el = document.getElementById("projects");
+              if (el) {
+                const yOffset = -90; // GNB 헤더 여백 확보
+                const y = el.getBoundingClientRect().top + window.scrollY + yOffset;
+                window.scrollTo({ top: y, behavior: "smooth" });
+              }
+            }}
+          />
           <MetricCard icon={<CalendarDays className="h-5 w-5" aria-hidden />} label="전체 일정 항목" value={scheduleItemCount} />
           <MetricCard icon={<Users className="h-5 w-5" aria-hidden />} label="응답 대기 초대" value={pendingInvitationCount} />
         </div>
@@ -165,9 +179,26 @@ export function Dashboard() {
   );
 }
 
-function MetricCard({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
+function MetricCard({
+  icon,
+  label,
+  value,
+  onClick
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  onClick?: () => void;
+}) {
   return (
-    <Card className="shadow-none">
+    <Card
+      className={`shadow-none transition-all duration-200 ${
+        onClick
+          ? "cursor-pointer hover:border-brand-primary hover:shadow-card"
+          : ""
+      }`}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-lava-secondary">{label}</p>
