@@ -45,14 +45,36 @@ async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> 
       `- 로컬 환경 변수 NEXT_PUBLIC_API_BASE_URL 설정을 체크해 주세요.`,
       err
     );
-    throw new Error("서버와의 연결이 일시적으로 원활하지 않습니다. 인터넷 연결 상태를 확인하시거나 잠시 후 다시 시도해 주세요.");
+    throw new Error("네트워크 연결이 불안정합니다. 인터넷 연결 상태를 확인하시거나 잠시 후 다시 시도해 주세요.");
   }
 
   if (!response.ok) {
-    let message = response.status === 401 ? "로그인이 필요합니다." : "요청 처리에 실패했어요.";
+    let message = response.status === 401 ? "로그인이 필요합니다." : "서버 일시 오류가 발생했습니다.";
+    
+    // 500번대 인프라 에러 (Bad Gateway, Timeout 등) 필터링
+    if (response.status >= 500) {
+      message = "서버 점검 중이거나 일시적인 서비스 장애가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+    }
+
     try {
-      const body = await response.json();
-      message = body.issues?.[0]?.message || body.message || body.error || message;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const body = await response.json();
+        message = body.issues?.[0]?.message || body.message || body.error || message;
+      } else {
+        const text = await response.text();
+        // 리버스 프록시나 Express에서 던지는 생 텍스트 라우팅 에러 감지 및 정제
+        if (
+          text.includes("Cannot GET") ||
+          text.includes("Cannot POST") ||
+          text.includes("Cannot PUT") ||
+          text.includes("Cannot DELETE")
+        ) {
+          message = "요청한 서비스를 찾을 수 없거나 서버 설정 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+        } else if (text.length > 0 && text.length < 100) {
+          message = text;
+        }
+      }
     } catch {
       // Keep the generic fallback.
     }
