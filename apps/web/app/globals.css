@@ -3,19 +3,33 @@
 @tailwind utilities;
 
 :root {
-  color: #2f2f33;
-  background: #f5f6f8;
+  color: #24262b;
+  background: #f6f7f9;
+  --lava-grid: rgba(36, 38, 43, 0.045);
+  --lava-hairline: rgba(36, 38, 43, 0.08);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  min-width: 320px;
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
-  color: #2f2f33;
-  background: #f5f6f8;
+  color: #24262b;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(246, 247, 249, 0.94) 280px),
+    repeating-linear-gradient(90deg, transparent 0, transparent 31px, var(--lava-grid) 32px),
+    #f6f7f9;
+  font-feature-settings: "tnum";
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -23,6 +37,14 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:focus-visible,
@@ -34,22 +56,74 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+::selection {
+  background: #ffe0d5;
+  color: #24262b;
+}
+
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #c5cad3;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lava-panel {
+  border: 1px solid rgba(230, 232, 238, 0.94);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(251, 252, 253, 0.94)),
+    #ffffff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 16px 40px rgba(16, 24, 40, 0.06);
+}
+
+.lava-panel-subtle {
+  border: 1px solid rgba(230, 232, 238, 0.92);
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.035);
+}
+
+.lava-text-balance {
+  text-wrap: balance;
+}
+
+.lava-calendar .fc {
+  --fc-small-font-size: 12px;
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: #fbfcfd;
+  --fc-border-color: #e6e8ee;
+  --fc-today-bg-color: #fff1ec;
+}
+
 .lava-calendar .fc {
   font-family: inherit;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .lava-calendar .fc-toolbar-title {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
-  color: #2f2f33;
+  color: #24262b;
 }
 
 .lava-calendar .fc-button {
-  border: 1px solid #d8dce2;
+  min-height: 34px;
+  border: 1px solid #d7dbe4;
+  border-radius: 8px;
   background: #ffffff;
-  color: #2f2f33;
+  color: #24262b;
   box-shadow: none;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
 }
 
 .lava-calendar .fc-button:hover,
@@ -69,10 +143,38 @@ select:focus-visible {
 .lava-calendar .fc-theme-standard td,
 .lava-calendar .fc-theme-standard th,
 .lava-calendar .fc-theme-standard .fc-scrollgrid {
-  border-color: #e5e7eb;
+  border-color: #e6e8ee;
+}
+
+.lava-calendar .fc-scrollgrid {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lava-calendar .fc-col-header-cell {
+  background: #fbfcfd;
+}
+
+.lava-calendar .fc-col-header-cell-cushion {
+  padding: 10px 0;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .lava-calendar .fc-daygrid-day-number,
 .lava-calendar .fc-col-header-cell-cushion {
-  color: #2f2f33;
+  color: #24262b;
+}
+
+.lava-calendar .fc-daygrid-day-number {
+  padding: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lava-calendar .fc-daygrid-event {
+  border-radius: 6px;
+  padding: 2px 5px;
+  font-size: 11px;
+  font-weight: 700;
 }

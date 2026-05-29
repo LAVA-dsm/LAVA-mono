@@ -2,11 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { KeyRound, MailCheck, UserRound } from "lucide-react";
+import { KeyRound, MailCheck, ShieldCheck, UserRound } from "lucide-react";
 import type { AuthUser } from "@lava/shared";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { FieldWrapper, Input } from "@/components/ui/field";
 import { apiClient } from "@/lib/api-client";
 
@@ -97,10 +98,11 @@ export function SettingsPage() {
   return (
     <AppShell title="설정" activeNav="settings">
       <div className="mx-auto grid max-w-[1180px] gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <Card>
+        <Card className="relative overflow-hidden p-7">
+          <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#FF5A2D,#20A99A,#5865F2)]" />
           <div className="mb-6 flex items-center gap-2">
             <UserRound className="h-5 w-5 text-brand-primary" aria-hidden />
-            <h1 className="text-[22px] font-bold leading-[30px] text-lava-text">프로필</h1>
+            <h1 className="text-[22px] font-black leading-[30px] text-lava-text">프로필</h1>
           </div>
           {isLoading ? <p className="text-sm text-lava-secondary">프로필을 불러오는 중입니다.</p> : null}
           {user ? (
@@ -109,24 +111,27 @@ export function SettingsPage() {
               <ProfileValue label="이메일" value={user.email} />
             </div>
           ) : null}
+          <div className="mt-7 rounded-lg border border-lava-border bg-lava-raised p-4">
+            <div className="flex items-center gap-2 text-sm font-black text-lava-text">
+              <ShieldCheck className="h-4 w-4 text-lava-success" aria-hidden />
+              계정 보안
+            </div>
+            <p className="mt-2 text-xs leading-5 text-lava-secondary">비밀번호 변경은 이메일 인증 후 진행됩니다.</p>
+          </div>
         </Card>
 
-        <Card>
+        <Card className="p-7">
           <div className="mb-6 flex items-center gap-2">
             <KeyRound className="h-5 w-5 text-brand-primary" aria-hidden />
-            <h2 className="text-[22px] font-bold leading-[30px] text-lava-text">비밀번호 변경</h2>
+            <h2 className="text-[22px] font-black leading-[30px] text-lava-text">비밀번호 변경</h2>
           </div>
           <p className="mb-5 text-sm leading-6 text-lava-secondary">
             로그인된 이메일로 인증 코드를 받은 뒤 새 비밀번호를 설정합니다.
           </p>
 
-          {error ? (
-            <div role="alert" className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-brand-red">
-              {error}
-            </div>
-          ) : null}
+          {error ? <ErrorAlert message={error} /> : null}
           {statusMessage ? (
-            <div role="status" className="mb-5 rounded-md bg-green-50 px-4 py-3 text-sm font-semibold text-lava-success">
+            <div role="status" className="mb-5 rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-sm font-bold text-lava-success">
               {statusMessage}
             </div>
           ) : null}
@@ -184,9 +189,9 @@ export function SettingsPage() {
 
 function ProfileValue({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-xs font-semibold text-lava-secondary">{label}</p>
-      <p className="mt-1 text-sm font-bold text-lava-text">{value}</p>
+    <div className="rounded-lg border border-lava-border bg-white px-4 py-3">
+      <p className="text-xs font-bold text-lava-muted">{label}</p>
+      <p className="mt-1 truncate text-sm font-black text-lava-text">{value}</p>
     </div>
   );
 }

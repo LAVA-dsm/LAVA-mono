@@ -1,14 +1,18 @@
 "use client";
 
 import {
-  Settings,
+  Bell,
+  ChevronDown,
+  FolderPlus,
+  LayoutDashboard,
   LogOut,
-  ChevronDown
+  Settings,
+  Sparkles
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AuthUser } from "@lava/shared";
 import { apiClient } from "@/lib/api-client";
 
@@ -18,7 +22,7 @@ export function AppShell({
   children
 }: {
   title: ReactNode;
-  activeNav?: any;
+  activeNav?: string;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -48,13 +52,13 @@ export function AppShell({
     };
   }, [pathname, router]);
 
-  // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -71,62 +75,164 @@ export function AppShell({
   };
 
   const isSettingsActive = pathname.startsWith("/settings");
+  const navItems = [
+    {
+      label: "대시보드",
+      href: "/",
+      icon: LayoutDashboard,
+      active: pathname === "/" && activeNav !== "settings"
+    },
+    {
+      label: "새 프로젝트",
+      href: "/projects/new",
+      icon: FolderPlus,
+      active: pathname.startsWith("/projects/new")
+    },
+    {
+      label: "설정",
+      href: "/settings",
+      icon: Settings,
+      active: isSettingsActive || activeNav === "settings"
+    }
+  ];
 
   return (
-    <div className="min-h-screen bg-lava-app">
-      {/* 상단 고정 GNB 헤더 */}
-      <header className="fixed left-0 right-0 top-0 z-50 flex h-[70px] items-center justify-between border-b border-lava-border bg-white px-10">
-        {/* 좌측 로고 영역 */}
-        <div className="flex items-center gap-10">
-          <Link href="/" className="flex items-center gap-2">
+    <div className="min-h-screen bg-lava-app text-lava-text">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[268px] border-r border-lava-border bg-white/88 px-5 py-5 shadow-[12px_0_32px_rgba(16,24,40,0.035)] backdrop-blur-xl lg:flex lg:flex-col">
+        <Link href="/" className="flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-lava-raised">
+          <Image
+            src="/lava_logo.png"
+            alt="LAVA"
+            width={38}
+            height={38}
+            className="h-[38px] w-[38px] object-contain"
+            priority
+          />
+          <div>
+            <span className="block text-lg font-black leading-tight text-brand-ink">LAVA</span>
+            <span className="text-xs font-semibold text-lava-muted">Project intelligence</span>
+          </div>
+        </Link>
+
+        <nav className="mt-8 space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-bold transition-all duration-200 ${
+                  item.active
+                    ? "bg-brand-warmBg text-brand-primary shadow-[inset_0_0_0_1px_rgba(255,90,45,0.11)]"
+                    : "text-lava-secondary hover:bg-lava-raised hover:text-lava-text"
+                }`}
+              >
+                <Icon
+                  className={`h-[18px] w-[18px] ${item.active ? "text-brand-primary" : "text-lava-muted group-hover:text-lava-text"}`}
+                  aria-hidden
+                />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="mt-8 rounded-lg border border-lava-border bg-lava-raised p-4">
+          <div className="flex items-center gap-2 text-xs font-black uppercase text-brand-primary">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
+            LAVA AI
+          </div>
+          <p className="mt-3 text-sm font-bold leading-5 text-lava-text">아이디어를 실행 가능한 문서로 바꾸는 작업대</p>
+          <p className="mt-2 text-xs leading-5 text-lava-secondary">기능 명세, API 명세, 일정을 한 흐름에서 다듬습니다.</p>
+        </div>
+
+        <div className="mt-auto rounded-lg border border-lava-border bg-white p-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-warmBg text-sm font-black text-brand-primary">
+              {user?.name.slice(0, 2) || "LA"}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-lava-text">{user?.name || "사용자"}</p>
+              <p className="truncate text-xs text-lava-secondary">{user?.email || "로그인 확인 중"}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-lava-border bg-lava-raised text-xs font-bold text-lava-secondary transition hover:border-red-100 hover:bg-red-50 hover:text-brand-red"
+          >
+            <LogOut className="h-3.5 w-3.5" aria-hidden />
+            로그아웃
+          </button>
+        </div>
+      </aside>
+
+      <header className="fixed left-0 right-0 top-0 z-40 flex h-[74px] items-center justify-between border-b border-lava-border bg-white/82 px-4 backdrop-blur-xl sm:px-6 lg:left-[268px] lg:px-8">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href="/" className="flex items-center gap-2 rounded-lg py-1 pr-2 lg:hidden">
             <Image
               src="/lava_logo.png"
               alt="LAVA"
-              width={36}
-              height={36}
-              className="h-9 w-9 object-contain"
+              width={34}
+              height={34}
+              className="h-[34px] w-[34px] object-contain"
               priority
             />
-            <span className="text-xl font-bold tracking-tight text-brand-primary">LAVA</span>
+            <span className="text-lg font-black text-brand-ink">LAVA</span>
           </Link>
+          <div className="min-w-0 border-l border-lava-border pl-4 lg:border-l-0 lg:pl-0">
+            {typeof title === "string" ? (
+              <h1 className="truncate text-base font-black text-lava-text sm:text-lg">{title}</h1>
+            ) : (
+              title
+            )}
+          </div>
         </div>
 
-        {/* 우측 사용자 영역 */}
-        <div className="flex items-center gap-6">
-          {/* 현재 페이지 제목 보조 노출 */}
-          <div className="hidden text-sm font-bold text-lava-secondary sm:block border-r border-lava-border pr-6">
-            {title}
-          </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/projects/new"
+            className="hidden h-10 items-center gap-2 rounded-lg bg-brand-primary px-4 text-sm font-bold text-white shadow-[0_10px_22px_rgba(255,90,45,0.22)] transition hover:-translate-y-0.5 hover:bg-brand-primaryHover sm:flex"
+          >
+            <FolderPlus className="h-4 w-4" aria-hidden />
+            새 프로젝트
+          </Link>
+          <button
+            type="button"
+            aria-label="알림"
+            className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-lava-border bg-white text-lava-secondary shadow-sm transition hover:border-brand-primary hover:text-brand-primary"
+          >
+            <Bell className="h-4 w-4" aria-hidden />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-red ring-2 ring-white" />
+          </button>
 
-          {/* 프로필 드롭다운 컨테이너 */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-3 rounded-lg border border-lava-border bg-white p-2 text-left transition-all duration-200 hover:bg-lava-app hover:border-lava-borderStrong focus:outline-none"
+              className="flex h-10 items-center gap-2 rounded-lg border border-lava-border bg-white px-2 text-left shadow-sm transition-all duration-200 hover:border-lava-borderStrong hover:bg-lava-raised focus:outline-none sm:gap-3"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-warmBg text-xs font-bold text-brand-primary">
-                {user?.name.slice(0, 2) || "사용"}
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-warmBg text-xs font-black text-brand-primary">
+                {user?.name.slice(0, 2) || "LA"}
               </div>
-              <div className="hidden max-w-[120px] md:block">
-                <p className="truncate text-xs font-bold text-lava-text leading-tight">{user?.name || "사용자"}</p>
-                <p className="truncate text-[10px] text-lava-secondary leading-tight">{user?.email || "확인 중"}</p>
+              <div className="hidden max-w-[150px] md:block">
+                <p className="truncate text-xs font-black leading-tight text-lava-text">{user?.name || "사용자"}</p>
+                <p className="truncate text-[11px] leading-tight text-lava-secondary">{user?.email || "확인 중"}</p>
               </div>
               <ChevronDown className={`h-4 w-4 text-lava-secondary transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`} />
             </button>
 
-            {/* 드롭다운 카드 */}
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-lg border border-lava-border bg-white p-2 shadow-float animate-in fade-in slide-in-from-top-1 duration-150 z-50">
-                <div className="border-b border-lava-border px-3 py-2 pb-3 mb-2">
-                  <p className="text-xs text-lava-secondary">로그인된 계정</p>
-                  <p className="truncate text-sm font-bold text-lava-text mt-0.5">{user?.name}</p>
+              <div className="absolute right-0 z-50 mt-2 w-64 animate-lava-enter rounded-lg border border-lava-border bg-white p-2 shadow-float">
+                <div className="mb-2 border-b border-lava-border px-3 py-3">
+                  <p className="text-xs font-semibold text-lava-secondary">로그인된 계정</p>
+                  <p className="mt-0.5 truncate text-sm font-black text-lava-text">{user?.name}</p>
                   <p className="truncate text-xs text-lava-secondary">{user?.email}</p>
                 </div>
 
                 <Link
                   href="/settings"
                   onClick={() => setIsDropdownOpen(false)}
-                  className={`flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-semibold text-lava-text hover:bg-lava-app transition-colors ${
+                  className={`flex h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-bold text-lava-text transition-colors hover:bg-lava-raised ${
                     isSettingsActive ? "bg-brand-warmBg text-brand-primary" : ""
                   }`}
                 >
@@ -139,9 +245,9 @@ export function AppShell({
                     setIsDropdownOpen(false);
                     handleLogout();
                   }}
-                  className="flex w-full h-10 items-center gap-2.5 rounded-md px-3 text-sm font-semibold text-lava-text hover:bg-lava-app hover:text-brand-red transition-colors mt-1 text-left"
+                  className="mt-1 flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-bold text-lava-text transition-colors hover:bg-red-50 hover:text-brand-red"
                 >
-                  <LogOut className="h-4 w-4 text-lava-secondary hover:text-brand-red" />
+                  <LogOut className="h-4 w-4 text-lava-secondary" />
                   로그아웃
                 </button>
               </div>
@@ -150,10 +256,8 @@ export function AppShell({
         </div>
       </header>
 
-      {/* 메인 콘텐츠 영역 (반응형 max-width 제한 및 중앙 정렬 적용) */}
-      <main className="max-w-7xl mx-auto w-full px-10 pb-12 pt-[102px]">
-        {/* 대시보드 및 각종 서브 페이지들이 이 max-w-7xl 컨테이너 중앙 정렬에 쾌적하게 얹어집니다. */}
-        {children}
+      <main className="w-full px-4 pb-12 pt-[94px] sm:px-6 lg:pl-[300px] lg:pr-8">
+        <div className="mx-auto w-full max-w-[1680px] animate-lava-enter">{children}</div>
       </main>
     </div>
   );

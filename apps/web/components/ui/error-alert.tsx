@@ -16,7 +16,7 @@ export function ErrorAlert({ message, onRetry, details, className = "" }: ErrorA
   return (
     <div
       role="alert"
-      className={`mb-6 rounded-xl border border-red-100 bg-red-50/50 p-4 shadow-sm transition-all duration-300 ${className}`}
+      className={`mb-6 rounded-lg border border-red-100 bg-red-50/70 p-4 shadow-sm transition-all duration-300 ${className}`}
     >
       <div className="flex items-start gap-3">
         {/* 에러 경고 아이콘 - 색상에만 의존하지 않는 명확한 경고 시각화 */}
@@ -56,7 +56,7 @@ export function ErrorAlert({ message, onRetry, details, className = "" }: ErrorA
           <button
             type="button"
             onClick={onRetry}
-            className="flex items-center gap-1.5 shrink-0 rounded-lg bg-white border border-red-200 px-3 py-1.5 text-xs font-bold text-brand-red shadow-sm transition-all hover:bg-red-50 hover:border-red-300 focus:outline-none"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-brand-red shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-50 focus:outline-none"
           >
             <RefreshCw className="h-3 w-3" />
             <span>다시 시도</span>

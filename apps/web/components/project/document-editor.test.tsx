@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import type { ProjectDocumentSummary, ProjectDocumentType, ProjectSummary } from "@lava/shared";
 import { apiClient } from "@/lib/api-client";
 import { DocumentEditor } from "./document-editor";
@@ -14,6 +15,10 @@ vi.mock("next/navigation", () => ({
     push
   }),
   usePathname: () => "/projects/project-1"
+}));
+
+vi.mock("@/components/layout/app-shell", () => ({
+  AppShell: ({ children }: { children: ReactNode }) => <div>{children}</div>
 }));
 
 vi.mock("@/lib/api-client", () => ({
@@ -174,16 +179,17 @@ describe("DocumentEditor", () => {
   });
 
   it("saves direct document edits", async () => {
-    const user = userEvent.setup();
     render(<DocumentEditor projectId="project-1" documentType="feature_spec" />);
 
     const body = await screen.findByLabelText(/문서 본문/);
-    fireEvent.change(body, { target: { value: "# 직접 수정한 기능 명세서" } });
-    await user.click(screen.getByRole("button", { name: "저장" }));
+    const nextContent = "# 직접 수정한 기능 명세서";
+    fireEvent.change(body, { target: { value: nextContent } });
+    await waitFor(() => expect(screen.getByText(`${nextContent.length}/2000`)).toBeInTheDocument());
+    fireEvent.click(await screen.findByRole("button", { name: /저장/ }));
 
     await waitFor(() =>
       expect(mockedApiClient.updateProjectDocument).toHaveBeenCalledWith("project-1", "feature_spec", {
-        content: "# 직접 수정한 기능 명세서"
+        content: nextContent
       })
     );
     expect(await screen.findByRole("status")).toHaveTextContent("저장 완료");
@@ -194,8 +200,9 @@ describe("DocumentEditor", () => {
 
     const body = await screen.findByLabelText(/문서 본문/);
     fireEvent.change(body, { target: { value: "가".repeat(2001) } });
+    await waitFor(() => expect(screen.getByText("2001/2000")).toBeInTheDocument());
 
-    expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();
+    await waitFor(async () => expect(await screen.findByRole("button", { name: /저장/ })).toBeDisabled());
     expect(screen.getByText("기능 명세서는 2000자 이하로 저장해야 합니다.")).toBeInTheDocument();
   });
 
@@ -205,8 +212,9 @@ describe("DocumentEditor", () => {
     render(<DocumentEditor projectId="project-1" documentType="feature_spec" />);
 
     const body = await screen.findByLabelText(/문서 본문/);
-    await user.type(screen.getByLabelText(/AI 문서 수정 요청/), "로그인 기능 상세화해줘.");
-    await user.click(screen.getByRole("button", { name: "AI로 문서 수정" }));
+    await user.type(await screen.findByLabelText(/AI 문서 수정 요청/), "로그인 기능 상세화해줘.");
+    await waitFor(async () => expect(await screen.findByRole("button", { name: /AI로 문서 수정/ })).not.toBeDisabled());
+    await user.click(await screen.findByRole("button", { name: /AI로 문서 수정/ }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("AI 문서 수정에 실패했어요.");
     expect(body).toHaveValue("# 기능 명세서");

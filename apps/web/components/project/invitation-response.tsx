@@ -8,6 +8,7 @@ import { apiClient } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { FieldWrapper, Input } from "@/components/ui/field";
 
 const dayOptions: Array<{ value: DayOfWeek; label: string }> = [
@@ -103,15 +104,16 @@ export function InvitationResponse({ token }: { token: string }) {
   };
 
   return (
-    <main className="min-h-screen bg-lava-app px-6 py-12">
+    <main className="min-h-screen bg-lava-app px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-[760px]">
-        <Card>
+        <Card className="relative overflow-hidden p-7 sm:p-8">
+          <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#FF5A2D,#20A99A,#5865F2)]" />
           <div className="mb-8 flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-warmBg text-brand-primary">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-warmBg text-brand-primary">
               <CalendarPlus className="h-6 w-6" aria-hidden />
             </div>
             <div>
-              <h1 className="text-[28px] font-bold leading-[38px] text-lava-text">프로젝트 초대</h1>
+              <h1 className="text-[30px] font-black leading-[1.18] text-lava-text">프로젝트 초대</h1>
               <p className="mt-2 text-sm leading-6 text-lava-secondary">
                 초대를 수락하면 전공, 기술 스택, 참여 가능 시간이 일정 생성에 반영됩니다.
               </p>
@@ -120,24 +122,20 @@ export function InvitationResponse({ token }: { token: string }) {
 
           {isLoading ? <p className="text-sm text-lava-secondary">초대를 불러오는 중입니다.</p> : null}
 
-          {error ? (
-            <div role="alert" className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-brand-red">
-              {error}
-            </div>
-          ) : null}
+          {error ? <ErrorAlert message={error} /> : null}
 
           {invitation ? (
-            <div className="mb-7 rounded-lg border border-lava-borderStrong p-5">
+            <div className="mb-7 rounded-lg border border-lava-borderStrong bg-lava-raised p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold text-lava-secondary">초대 프로젝트</p>
-                  <h2 className="mt-1 text-[22px] font-bold leading-[30px] text-lava-text">{invitation.projectName}</h2>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-lava-muted">초대 프로젝트</p>
+                  <h2 className="mt-2 text-[22px] font-black leading-[30px] text-lava-text">{invitation.projectName}</h2>
                 </div>
                 <Badge tone={invitation.status === "pending" ? "warning" : invitation.status === "accepted" ? "success" : "gray"}>
                   {formatStatus(invitation.status)}
                 </Badge>
               </div>
-              <p className="mt-4 text-sm text-lava-secondary">초대 이메일: {invitation.email}</p>
+              <p className="mt-4 text-sm font-semibold text-lava-secondary">초대 이메일: {invitation.email}</p>
             </div>
           ) : null}
 
@@ -169,9 +167,9 @@ export function InvitationResponse({ token }: { token: string }) {
                 </div>
                 <div className="space-y-3">
                   {availableTimes.map((time, index) => (
-                    <div key={`${time.dayOfWeek}-${index}`} className="grid gap-3 rounded-md border border-lava-border p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+                    <div key={`${time.dayOfWeek}-${index}`} className="grid gap-3 rounded-lg border border-lava-border bg-lava-raised p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
                       <select
-                        className="h-11 rounded-md border border-lava-borderStrong bg-white px-3 text-sm text-lava-text"
+                        className="h-11 rounded-lg border border-lava-borderStrong bg-white px-3 text-sm text-lava-text shadow-sm"
                         value={time.dayOfWeek}
                         onChange={(event) => updateTime(index, "dayOfWeek", event.target.value as DayOfWeek)}
                       >

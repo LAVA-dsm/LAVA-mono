@@ -113,27 +113,28 @@ function ProjectContent({
 
   return (
     <>
-      <Card className="border-l-4 border-l-brand-primary">
+      <Card className="relative overflow-hidden p-7">
+        <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#FF5A2D,#20A99A,#5865F2)]" />
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[28px] font-bold leading-[38px] text-lava-text">{project.name}</h1>
+              <h1 className="text-[30px] font-black leading-[1.18] text-lava-text sm:text-[36px]">{project.name}</h1>
               <Badge tone="warning">진행중</Badge>
               <Badge tone="purple">{project.schedule ? "일정 생성 완료" : "일정 생성 대기"}</Badge>
             </div>
-            <p className="mt-4 max-w-3xl text-sm leading-6 text-lava-secondary">
+            <p className="lava-text-balance mt-4 max-w-4xl text-sm leading-6 text-lava-secondary">
               {project.enhancedIdea || project.originalIdea}
             </p>
-            <div className="mt-6 flex flex-wrap gap-5 text-sm text-lava-secondary">
-              <span className="inline-flex items-center gap-2">
+            <div className="mt-6 flex flex-wrap gap-3 text-sm text-lava-secondary">
+              <span className="inline-flex items-center gap-2 rounded-lg border border-lava-border bg-lava-raised px-3 py-2 font-semibold">
                 <Clock3 className="h-4 w-4" aria-hidden />
                 {project.startDate} ~ {project.endDate}
               </span>
-              <span className="inline-flex items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-lg border border-lava-border bg-lava-raised px-3 py-2 font-semibold">
                 <Users className="h-4 w-4" aria-hidden />
                 {project.type === "team" ? `${project.members.length}명 참여 · ${project.inviteCount}명 대기` : "개인 프로젝트"}
               </span>
-              <span className="inline-flex items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-lg border border-lava-border bg-lava-raised px-3 py-2 font-semibold">
                 <FileText className="h-4 w-4" aria-hidden />
                 AI 문서 {project.documents.length}/2 생성 완료
               </span>
@@ -172,9 +173,14 @@ function DocumentsSection({
 }) {
   return (
     <section>
-      <div className="mb-5 flex items-center gap-2">
-        <FileText className="h-5 w-5 text-brand-primary" aria-hidden />
-        <h2 className="text-[22px] font-bold leading-[30px] text-lava-text">프로젝트 산출물 문서</h2>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-brand-primary" aria-hidden />
+            <h2 className="text-[22px] font-black leading-[30px] text-lava-text">프로젝트 산출물 문서</h2>
+          </div>
+          <p className="mt-1 text-sm text-lava-secondary">AI 초안을 열고 바로 편집할 수 있습니다.</p>
+        </div>
       </div>
       <div className="grid gap-6 xl:grid-cols-3">
         <DocumentCard
@@ -221,20 +227,20 @@ function DocumentCard({
   href?: string;
 }) {
   return (
-    <Card className="shadow-none">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-lg bg-brand-warmBg p-4">
+    <Card className="group relative min-h-[310px] overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:border-brand-primary">
+      <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-lg bg-brand-warmBg p-3 transition group-hover:scale-105">
         {icon}
       </div>
-      <h3 className="text-[18px] font-bold leading-[26px] text-lava-text">{title}</h3>
+      <h3 className="text-[18px] font-black leading-[26px] text-lava-text">{title}</h3>
       <p className="mt-3 min-h-12 text-sm leading-6 text-lava-secondary">{description}</p>
       <div className="mt-6 flex items-center justify-between border-t border-lava-border pt-4">
-        <span className="text-xs text-lava-secondary">{meta}</span>
+        <span className="text-xs font-semibold text-lava-secondary">{meta}</span>
         <Badge>{label}</Badge>
       </div>
       {href ? (
         <Link
           href={href}
-          className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-lava-borderStrong bg-white px-5 text-sm font-semibold text-lava-text transition hover:border-brand-primary hover:text-brand-primary"
+          className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-lava-borderStrong bg-white px-5 text-sm font-black text-lava-text transition hover:border-brand-primary hover:text-brand-primary"
         >
           열기
           <ArrowRight className="h-4 w-4" aria-hidden />
@@ -279,7 +285,7 @@ function ParticipationSection({
 
   return (
     <Card>
-      <h2 className="text-[18px] font-bold leading-[26px] text-lava-text">내 참여 정보</h2>
+      <h2 className="text-[18px] font-black leading-[26px] text-lava-text">내 참여 정보</h2>
       <p className="mt-2 text-sm leading-6 text-lava-secondary">AI 일정 생성에 사용하는 기본 정보입니다.</p>
       {error ? <p className="mt-4 text-sm font-semibold text-brand-red">{error}</p> : null}
       <div className="mt-5 space-y-4">
@@ -326,9 +332,9 @@ function AvailabilityEditor({
   return (
     <div className="space-y-3">
       {availableTimes.map((time, index) => (
-        <div key={`${time.dayOfWeek}-${index}`} className="grid gap-2 rounded-md border border-lava-border p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+        <div key={`${time.dayOfWeek}-${index}`} className="grid gap-2 rounded-lg border border-lava-border bg-lava-raised p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
           <select
-            className="h-11 rounded-md border border-lava-borderStrong bg-white px-3 text-sm text-lava-text"
+            className="h-11 rounded-lg border border-lava-borderStrong bg-white px-3 text-sm text-lava-text shadow-sm"
             value={time.dayOfWeek}
             onChange={(event) => update(index, "dayOfWeek", event.target.value as DayOfWeek)}
           >
@@ -359,12 +365,12 @@ function AvailabilityEditor({
 function InvitationStatusSection({ project }: { project: ProjectSummary }) {
   return (
     <Card>
-      <h2 className="text-[18px] font-bold leading-[26px] text-lava-text">초대 상태</h2>
+      <h2 className="text-[18px] font-black leading-[26px] text-lava-text">초대 상태</h2>
       <div className="mt-5 space-y-3">
         {project.invitations.length ? (
           project.invitations.map((invitation) => (
-            <div key={invitation.id} className="flex items-center justify-between gap-3 border-b border-lava-border pb-3 last:border-b-0 last:pb-0">
-              <span className="truncate text-sm font-semibold text-lava-text">{invitation.email}</span>
+            <div key={invitation.id} className="flex items-center justify-between gap-3 rounded-lg border border-lava-border bg-white px-3 py-3">
+              <span className="truncate text-sm font-bold text-lava-text">{invitation.email}</span>
               <Badge tone={invitation.status === "pending" ? "warning" : invitation.status === "accepted" ? "success" : "gray"}>
                 {formatInvitationStatus(invitation.status)}
               </Badge>
@@ -418,7 +424,7 @@ function ProjectManagementSection({ project }: { project: ProjectSummary }) {
 
   return (
     <Card>
-      <h2 className="text-[18px] font-bold leading-[26px] text-lava-text">프로젝트 관리</h2>
+      <h2 className="text-[18px] font-black leading-[26px] text-lava-text">프로젝트 관리</h2>
       <p className="mt-2 text-sm leading-6 text-lava-secondary">
         삭제와 탈퇴는 프로젝트 접근 권한에 바로 영향을 줍니다.
       </p>
@@ -426,7 +432,7 @@ function ProjectManagementSection({ project }: { project: ProjectSummary }) {
       {error ? <p className="mt-4 text-sm font-semibold text-brand-red">{error}</p> : null}
 
       <div className="mt-5 space-y-4">
-        <div className="rounded-lg border border-lava-border p-4">
+        <div className="rounded-lg border border-lava-border bg-lava-raised p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-bold text-lava-text">프로젝트 나가기</p>
@@ -451,7 +457,7 @@ function ProjectManagementSection({ project }: { project: ProjectSummary }) {
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-lava-text">새 리더</label>
                   <select
-                    className="h-11 w-full rounded-md border border-lava-borderStrong bg-white px-3 text-sm text-lava-text"
+                    className="h-11 w-full rounded-lg border border-lava-borderStrong bg-white px-3 text-sm text-lava-text shadow-sm"
                     value={newLeaderUserId}
                     onChange={(event) => setNewLeaderUserId(event.target.value)}
                   >
@@ -481,7 +487,7 @@ function ProjectManagementSection({ project }: { project: ProjectSummary }) {
         </div>
 
         {isLeader ? (
-          <div className="rounded-lg border border-red-100 bg-red-50 p-4">
+          <div className="rounded-lg border border-red-100 bg-red-50/75 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold text-brand-red">프로젝트 삭제</p>
@@ -592,7 +598,7 @@ function ScheduleSection({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <CalendarCheck className="h-5 w-5 text-brand-primary" aria-hidden />
-          <h2 className="text-[22px] font-bold leading-[30px] text-lava-text">프로젝트 일정</h2>
+          <h2 className="text-[22px] font-black leading-[30px] text-lava-text">프로젝트 일정</h2>
         </div>
         {isLeader ? (
           <div className="flex flex-wrap gap-2">
@@ -606,7 +612,7 @@ function ScheduleSection({
         ) : null}
       </div>
 
-      <Card>
+      <Card className="overflow-hidden">
         {error ? (
           <div role="alert" className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-brand-red">
             {error}
@@ -618,7 +624,7 @@ function ScheduleSection({
         ) : (
           <div className="space-y-4">
             {items.map((item, index) => (
-              <div key={item.id ?? index} className="rounded-lg border border-lava-border p-4">
+              <div key={item.id ?? index} className="rounded-lg border border-lava-border bg-white p-4 shadow-sm">
                 {isLeader ? (
                   <EditableScheduleItem
                     item={item}
@@ -660,7 +666,7 @@ function ScheduleSection({
         ) : null}
 
         {isLeader && schedule ? (
-          <div className="mt-8 border-t border-lava-border pt-5">
+          <div className="mt-8 rounded-lg border border-lava-border bg-lava-raised p-4">
             <FieldWrapper label="AI 일정 수정 요청">
               <Textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="예: 회의 일정을 주말 대신 평일 저녁으로 조정해줘." />
             </FieldWrapper>
@@ -697,7 +703,7 @@ function EditableScheduleItem({
       <div className="grid gap-3 md:grid-cols-[1fr_160px_auto]">
         <Input value={item.title} onChange={(event) => onChange("title", event.target.value)} placeholder="일정 제목" />
         <select
-          className="h-11 rounded-md border border-lava-borderStrong bg-white px-3 text-sm text-lava-text"
+          className="h-11 rounded-lg border border-lava-borderStrong bg-white px-3 text-sm text-lava-text shadow-sm"
           value={item.type}
           onChange={(event) => onChange("type", event.target.value as ScheduleItemType)}
         >
@@ -722,11 +728,11 @@ function EditableScheduleItem({
             key={member.userId}
             type="button"
             onClick={() => toggleAssignee(member.userId)}
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              item.assigneeUserIds.includes(member.userId)
-                ? "bg-brand-warmBg text-brand-primary"
-                : "bg-gray-100 text-lava-secondary"
-            }`}
+          className={`rounded-full border px-3 py-1 text-xs font-bold transition ${
+            item.assigneeUserIds.includes(member.userId)
+              ? "border-brand-primary/30 bg-brand-warmBg text-brand-primary"
+              : "border-lava-border bg-gray-100 text-lava-secondary hover:border-brand-primary hover:text-brand-primary"
+          }`}
           >
             {member.name}
           </button>
@@ -745,7 +751,7 @@ function ReadOnlyScheduleItem({ item, members }: { item: ScheduleItemInput; memb
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-bold text-lava-text">{item.title}</h3>
+        <h3 className="text-sm font-black text-lava-text">{item.title}</h3>
         <Badge tone={item.type === "meeting" ? "warning" : item.type === "sprint" ? "purple" : "gray"}>
           {scheduleTypes.find((type) => type.value === item.type)?.label}
         </Badge>

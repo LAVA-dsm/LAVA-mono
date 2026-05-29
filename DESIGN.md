@@ -4,12 +4,7 @@
 
 ## 기준 화면
 
-| 파일 | 화면 | 디자인에서 읽어야 할 것 |
-| --- | --- | --- |
-| [home.png](./docs/assets/prototypes/home.png) | 대시보드 홈 | 앱 셸, 사이드바, 카드, 캘린더, 최근 메시지 |
-| [project-generate.png](./docs/assets/prototypes/project-generate.png) | 새 프로젝트 생성 최종 확인 | 단계형 생성 플로우, 확인 카드, 주요 CTA |
-| [project-home.png](./docs/assets/prototypes/project-home.png) | 프로젝트 홈 | 프로젝트 헤더, 산출물 카드, 외부 링크 버튼 |
-| [project-fsd.png](./docs/assets/prototypes/project-fsd.png) | 기능 명세서 편집 | 문서 편집 레이아웃, 탭, 저장 상태, AI 어시스턴트 패널 |
+MVP 프로토타입 PNG는 더 이상 디자인 기준으로 사용하지 않습니다. 현재 기준은 `apps/web`에 구현된 실제 화면이며, 대시보드, 프로젝트 생성, 프로젝트 홈, 문서 편집, 인증 화면은 이 문서의 제품 인상과 컴포넌트 원칙을 따른 구현 결과를 기준으로 검수합니다.
 
 ## 제품 인상
 

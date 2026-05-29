@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -22,6 +22,7 @@ import { apiClient } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { FieldWrapper, Input, Textarea } from "@/components/ui/field";
 
 type WizardStep = 0 | 1 | 2 | 3;
@@ -180,192 +181,208 @@ export function ProjectWizard() {
   };
 
   return (
-    <div className="mx-auto max-w-[1580px]">
-      <Stepper step={step} projectType={form.type} />
-      <Card className="mt-8">
-        {error ? (
-          <div role="alert" className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-brand-red">
-            {error}
-          </div>
-        ) : null}
-
-        {step === 0 ? (
-          <section>
-            <div className="mb-6 flex items-center gap-3">
-              <Sparkles className="h-5 w-5 text-brand-primary" aria-hidden />
-              <h1 className="text-[22px] font-bold leading-[30px] text-lava-text">Step 1. 프로젝트 기본 정보</h1>
-            </div>
-            <div className="grid gap-5 lg:grid-cols-2">
-              <FieldWrapper label="프로젝트 이름" hint="1자 이상 24자 이하">
-                <Input
-                  value={form.name}
-                  onChange={(event) => updateField("name", event.target.value)}
-                  placeholder="예: 포트폴리오용 금융앱 구축"
-                />
-              </FieldWrapper>
-              <FieldWrapper label="프로젝트 유형">
-                <div className="grid grid-cols-2 gap-3">
-                  {(["team", "personal"] as ProjectType[]).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => updateField("type", type)}
-                      className={`h-11 rounded-md border text-sm font-semibold ${
-                        form.type === type
-                          ? "border-brand-primary bg-brand-warmBg text-brand-primary"
-                          : "border-lava-borderStrong bg-white text-lava-text"
-                      }`}
-                    >
-                      {type === "team" ? "팀 프로젝트" : "개인 프로젝트"}
-                    </button>
-                  ))}
-                </div>
-              </FieldWrapper>
-              <FieldWrapper label="시작일">
-                <Input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(event) => updateField("startDate", event.target.value)}
-                  onClick={(e) => {
-                    try {
-                      e.currentTarget.showPicker();
-                    } catch (err) {
-                      console.warn("showPicker is not supported", err);
-                    }
-                  }}
-                  className="cursor-pointer"
-                />
-              </FieldWrapper>
-              <FieldWrapper label="종료일" hint="최대 365일까지 가능합니다.">
-                <Input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(event) => updateField("endDate", event.target.value)}
-                  onClick={(e) => {
-                    try {
-                      e.currentTarget.showPicker();
-                    } catch (err) {
-                      console.warn("showPicker is not supported", err);
-                    }
-                  }}
-                  className="cursor-pointer"
-                />
-              </FieldWrapper>
-            </div>
-            <div className="mt-5">
-              <FieldWrapper
-                label="프로젝트 아이디어"
-                hint={`${ideaLength}/${PROJECT_IDEA_MIN_LENGTH}자 이상`}
-              >
-                <Textarea
-                  value={form.originalIdea}
-                  onChange={(event) => updateField("originalIdea", event.target.value)}
-                  placeholder="어떤 문제를 해결하고 싶은지, 누가 사용할지, 꼭 들어가야 할 기능을 적어주세요."
-                />
-              </FieldWrapper>
-            </div>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                onClick={enhanceIdea}
-                disabled={form.ideaEnhancementUsed || isEnhancing}
-                icon={isEnhancing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              >
-                {form.ideaEnhancementUsed ? "AI 아이디어 증강 완료" : "AI 아이디어 증강"}
-              </Button>
-              <span className="text-xs text-lava-secondary">증강은 프로젝트 생성 중 1회만 사용할 수 있습니다.</span>
-            </div>
-            {form.ideaEnhancementUsed ? (
-              <div className="mt-5 rounded-lg border border-brand-primary bg-brand-warmBg p-4 text-sm text-lava-secondary">
-                AI가 아이디어를 현재 입력값에 반영했습니다. 아래 아이디어 칸의 내용이 바로 생성에 사용됩니다.
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
-        {step === 1 ? (
-          <section>
-            <div className="mb-6 flex items-center gap-3">
-              <Mail className="h-5 w-5 text-brand-primary" aria-hidden />
-              <h1 className="text-[22px] font-bold leading-[30px] text-lava-text">Step 2. 팀원 이메일 초대</h1>
-            </div>
-            <FieldWrapper label="초대 이메일" hint="쉼표 또는 줄바꿈으로 여러 명을 입력할 수 있습니다.">
-              <Textarea
-                value={form.inviteEmailsText}
-                onChange={(event) => updateField("inviteEmailsText", event.target.value)}
-                placeholder="teammate@example.com"
-              />
-            </FieldWrapper>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {inviteEmails.length ? (
-                inviteEmails.map((email) => <Badge key={email}>{email}</Badge>)
-              ) : (
-                <span className="text-sm text-lava-muted">초대할 팀원이 없으면 비워 둬도 됩니다.</span>
-              )}
-            </div>
-          </section>
-        ) : null}
-
-        {step === 2 ? (
-          <section>
-            <div className="mb-6 flex items-center gap-3">
-              <FileText className="h-5 w-5 text-brand-primary" aria-hidden />
-              <h1 className="text-[22px] font-bold leading-[30px] text-lava-text">Step 3. AI 명세 생성 준비</h1>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-lg border border-lava-border bg-white p-5">
-                <Badge tone="purple">기능 명세서</Badge>
-                <p className="mt-4 text-sm leading-6 text-lava-secondary">
-                  프로젝트 생성 후 기능명, 설명, 제약사항, 예외 처리를 포함한 초안이 동기 생성됩니다.
-                </p>
-              </div>
-              <div className="rounded-lg border border-lava-border bg-white p-5">
-                <Badge tone="purple">API 명세서</Badge>
-                <p className="mt-4 text-sm leading-6 text-lava-secondary">
-                  기능 명세서를 바탕으로 REST API 이름, 메서드, 경로, 요청/응답, 오류 케이스를 정리합니다.
-                </p>
-              </div>
-            </div>
-            <p className="mt-5 text-sm text-lava-secondary">
-              AI 호출이 실패해도 프로젝트는 생성되고 기본 안내 문구가 문서에 저장됩니다.
+    <div className="space-y-6">
+      <section className="rounded-lg border border-lava-border bg-white p-6 shadow-card sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <Badge tone="red">Project setup</Badge>
+            <h1 className="mt-4 text-[30px] font-black leading-[1.18] text-lava-text sm:text-[36px]">새 프로젝트 생성</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-lava-secondary">
+              아이디어, 참여자, 기간을 입력하면 LAVA가 기능 명세서와 API 명세서 초안을 생성합니다.
             </p>
-          </section>
-        ) : null}
+          </div>
+          <Badge tone={form.ideaEnhancementUsed ? "success" : "gray"}>
+            {form.ideaEnhancementUsed ? "AI 증강 완료" : "초안 작성 중"}
+          </Badge>
+        </div>
+        <Stepper step={step} projectType={form.type} />
+      </section>
 
-        {step === 3 ? (
-          <section>
-            <div className="mb-6 flex items-center gap-3">
-              <Check className="h-5 w-5 text-brand-primary" aria-hidden />
-              <h1 className="text-[22px] font-bold leading-[30px] text-lava-text">Step 4. 프로젝트 생성 최종 확인</h1>
-            </div>
-            <div className="rounded-lg border border-lava-borderStrong p-5">
-              <h2 className="text-sm font-bold text-brand-red">프로젝트 기본 정보</h2>
-              <dl className="mt-5 grid gap-3 text-sm md:grid-cols-[140px_1fr]">
-                <dt className="text-lava-secondary">프로젝트 이름</dt>
-                <dd className="font-semibold text-lava-text">{form.name || "미입력"}</dd>
-                <dt className="text-lava-secondary">프로젝트 유형</dt>
-                <dd className="font-semibold text-lava-text">
-                  {form.type === "team" ? "팀 프로젝트" : "개인 프로젝트"}
-                </dd>
-                <dt className="text-lava-secondary">프로젝트 일정</dt>
-                <dd className="font-semibold text-lava-text">
-                  {form.startDate || "시작일 미입력"} ~ {form.endDate || "종료일 미입력"}
-                </dd>
-                <dt className="text-lava-secondary">초대 인원</dt>
-                <dd className="font-semibold text-lava-text">{isPersonal ? "개인 프로젝트" : `${inviteEmails.length}명`}</dd>
-              </dl>
-            </div>
-            <div className="mt-5 rounded-lg border border-lava-borderStrong p-5">
-              <h2 className="text-sm font-bold text-brand-red">아이디어 요약</h2>
-              <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-lava-secondary">
-                {form.originalIdea || "아이디어가 아직 입력되지 않았습니다."}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="min-w-0">
+          {error ? <ErrorAlert className="mb-6" message={error} /> : null}
+
+          {step === 0 ? (
+            <section>
+              <SectionHeader
+                icon={<Sparkles className="h-5 w-5 text-brand-primary" aria-hidden />}
+                eyebrow="Step 1"
+                title="프로젝트 기본 정보"
+                description="프로젝트의 목표와 기간을 먼저 정리합니다."
+              />
+              <div className="grid gap-5 lg:grid-cols-2">
+                <FieldWrapper label="프로젝트 이름" hint="1자 이상 24자 이하">
+                  <Input
+                    value={form.name}
+                    onChange={(event) => updateField("name", event.target.value)}
+                    placeholder="예: 포트폴리오용 금융앱 구축"
+                  />
+                </FieldWrapper>
+                <FieldWrapper label="프로젝트 유형">
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["team", "personal"] as ProjectType[]).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => updateField("type", type)}
+                        className={`h-11 rounded-lg border text-sm font-black transition-all duration-200 ${
+                          form.type === type
+                            ? "border-brand-primary bg-brand-warmBg text-brand-primary shadow-[inset_0_0_0_1px_rgba(255,90,45,0.12)]"
+                            : "border-lava-borderStrong bg-white text-lava-text hover:border-brand-primary hover:text-brand-primary"
+                        }`}
+                      >
+                        {type === "team" ? "팀 프로젝트" : "개인 프로젝트"}
+                      </button>
+                    ))}
+                  </div>
+                </FieldWrapper>
+                <FieldWrapper label="시작일">
+                  <Input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(event) => updateField("startDate", event.target.value)}
+                    onClick={(event) => {
+                      try {
+                        event.currentTarget.showPicker();
+                      } catch (err) {
+                        console.warn("showPicker is not supported", err);
+                      }
+                    }}
+                    className="cursor-pointer"
+                  />
+                </FieldWrapper>
+                <FieldWrapper label="종료일" hint="최대 365일까지 가능합니다.">
+                  <Input
+                    type="date"
+                    value={form.endDate}
+                    onChange={(event) => updateField("endDate", event.target.value)}
+                    onClick={(event) => {
+                      try {
+                        event.currentTarget.showPicker();
+                      } catch (err) {
+                        console.warn("showPicker is not supported", err);
+                      }
+                    }}
+                    className="cursor-pointer"
+                  />
+                </FieldWrapper>
+              </div>
+              <div className="mt-5">
+                <FieldWrapper label="프로젝트 아이디어" hint={`${ideaLength}/${PROJECT_IDEA_MIN_LENGTH}자 이상`}>
+                  <Textarea
+                    value={form.originalIdea}
+                    onChange={(event) => updateField("originalIdea", event.target.value)}
+                    placeholder="어떤 문제를 해결하고 싶은지, 누가 사용할지, 꼭 들어가야 할 기능을 적어주세요."
+                    className="min-h-[220px]"
+                  />
+                </FieldWrapper>
+              </div>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  onClick={enhanceIdea}
+                  disabled={form.ideaEnhancementUsed || isEnhancing}
+                  icon={isEnhancing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                >
+                  {form.ideaEnhancementUsed ? "AI 아이디어 증강 완료" : "AI 아이디어 증강"}
+                </Button>
+                <span className="text-xs font-semibold text-lava-secondary">증강은 프로젝트 생성 중 1회만 사용할 수 있습니다.</span>
+              </div>
+              {form.ideaEnhancementUsed ? (
+                <div className="mt-5 rounded-lg border border-brand-primary/30 bg-brand-warmBg p-4 text-sm font-semibold text-lava-secondary">
+                  AI가 아이디어를 현재 입력값에 반영했습니다. 아래 아이디어 칸의 내용이 바로 생성에 사용됩니다.
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          {step === 1 ? (
+            <section>
+              <SectionHeader
+                icon={<Mail className="h-5 w-5 text-brand-primary" aria-hidden />}
+                eyebrow="Step 2"
+                title="팀원 이메일 초대"
+                description="초대할 팀원이 없다면 비워 둔 채 다음 단계로 이동할 수 있습니다."
+              />
+              <FieldWrapper label="초대 이메일" hint="쉼표 또는 줄바꿈으로 여러 명을 입력할 수 있습니다.">
+                <Textarea
+                  value={form.inviteEmailsText}
+                  onChange={(event) => updateField("inviteEmailsText", event.target.value)}
+                  placeholder="teammate@example.com"
+                  className="min-h-[220px]"
+                />
+              </FieldWrapper>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {inviteEmails.length ? (
+                  inviteEmails.map((email) => <Badge key={email}>{email}</Badge>)
+                ) : (
+                  <span className="text-sm text-lava-muted">초대할 팀원이 없으면 비워 둬도 됩니다.</span>
+                )}
+              </div>
+            </section>
+          ) : null}
+
+          {step === 2 ? (
+            <section>
+              <SectionHeader
+                icon={<FileText className="h-5 w-5 text-brand-primary" aria-hidden />}
+                eyebrow="Step 3"
+                title="AI 명세 생성 준비"
+                description="프로젝트 생성 직후 사용할 개발 문서 초안을 준비합니다."
+              />
+              <div className="grid gap-4 md:grid-cols-2">
+                <DeliverableCard title="기능 명세서" label="Feature Spec">
+                  프로젝트 목적, 핵심 기능, 제약사항, 예외 처리를 포함한 실행 가능한 초안이 생성됩니다.
+                </DeliverableCard>
+                <DeliverableCard title="API 명세서" label="REST API">
+                  REST API 이름, 메서드, 경로, 요청/응답, 오류 케이스를 구조화합니다.
+                </DeliverableCard>
+              </div>
+              <p className="mt-5 rounded-lg border border-lava-border bg-lava-raised px-4 py-3 text-sm font-semibold text-lava-secondary">
+                AI 호출이 실패해도 프로젝트는 생성되고 기본 안내 문구가 문서에 저장됩니다.
               </p>
-            </div>
-          </section>
-        ) : null}
-      </Card>
+            </section>
+          ) : null}
 
-      <div className="mt-8 flex items-center justify-between">
+          {step === 3 ? (
+            <section>
+              <SectionHeader
+                icon={<Check className="h-5 w-5 text-brand-primary" aria-hidden />}
+                eyebrow="Step 4"
+                title="프로젝트 생성 최종 확인"
+                description="생성 전 입력값을 한 번 더 확인합니다."
+              />
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div className="rounded-lg border border-lava-borderStrong bg-white p-5">
+                  <h2 className="text-sm font-black text-brand-red">프로젝트 기본 정보</h2>
+                  <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-[130px_1fr]">
+                    <dt className="text-lava-secondary">프로젝트 이름</dt>
+                    <dd className="font-bold text-lava-text">{form.name || "미입력"}</dd>
+                    <dt className="text-lava-secondary">프로젝트 유형</dt>
+                    <dd className="font-bold text-lava-text">{form.type === "team" ? "팀 프로젝트" : "개인 프로젝트"}</dd>
+                    <dt className="text-lava-secondary">프로젝트 일정</dt>
+                    <dd className="font-bold text-lava-text">
+                      {form.startDate || "시작일 미입력"} ~ {form.endDate || "종료일 미입력"}
+                    </dd>
+                    <dt className="text-lava-secondary">초대 인원</dt>
+                    <dd className="font-bold text-lava-text">{isPersonal ? "개인 프로젝트" : `${inviteEmails.length}명`}</dd>
+                  </dl>
+                </div>
+                <div className="rounded-lg border border-lava-borderStrong bg-white p-5">
+                  <h2 className="text-sm font-black text-brand-red">아이디어 요약</h2>
+                  <p className="mt-4 max-h-[260px] overflow-auto whitespace-pre-wrap text-sm leading-6 text-lava-secondary">
+                    {form.originalIdea || "아이디어가 아직 입력되지 않았습니다."}
+                  </p>
+                </div>
+              </div>
+            </section>
+          ) : null}
+        </Card>
+
+        <SummaryPanel form={form} inviteEmails={inviteEmails} step={step} />
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
         <Button type="button" variant="secondary" onClick={previousStep} disabled={step === 0 || isCreating}>
           <ChevronLeft className="h-4 w-4" aria-hidden />
           이전 단계
@@ -391,29 +408,42 @@ export function ProjectWizard() {
 
 function Stepper({ step, projectType }: { step: WizardStep; projectType: ProjectType }) {
   return (
-    <ol className="grid grid-cols-4 gap-6">
+    <ol className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {steps.map((label, index) => {
         const isSkipped = projectType === "personal" && index === 1;
         const isComplete = index < step && !isSkipped;
         const isCurrent = index === step;
 
         return (
-          <li key={label} className="relative flex items-center gap-3">
-            <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                isComplete || isCurrent
-                  ? "bg-brand-primary text-white"
+          <li
+            key={label}
+            className={`relative rounded-lg border px-4 py-3 transition-all ${
+              isCurrent
+                ? "border-brand-primary bg-brand-warmBg"
+                : isComplete
+                  ? "border-green-100 bg-green-50"
                   : isSkipped
-                    ? "bg-gray-100 text-lava-muted"
-                    : "bg-white text-lava-muted"
-              }`}
-            >
-              {isComplete ? <Check className="h-5 w-5" aria-hidden /> : index + 1}
-            </span>
-            <span className={`text-sm font-semibold ${isCurrent ? "text-brand-primary" : "text-lava-secondary"}`}>
-              {label}
-              {isSkipped ? <span className="block text-xs font-normal text-lava-muted">개인 프로젝트 제외</span> : null}
-            </span>
+                    ? "border-lava-border bg-lava-raised opacity-70"
+                    : "border-lava-border bg-white"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-black ${
+                  isComplete || isCurrent
+                    ? "bg-brand-primary text-white"
+                    : isSkipped
+                      ? "bg-gray-100 text-lava-muted"
+                      : "bg-lava-raised text-lava-muted"
+                }`}
+              >
+                {isComplete ? <Check className="h-5 w-5" aria-hidden /> : index + 1}
+              </span>
+              <span className={`text-sm font-black ${isCurrent ? "text-brand-primary" : "text-lava-text"}`}>
+                {label}
+                {isSkipped ? <span className="block text-xs font-semibold text-lava-muted">개인 프로젝트 제외</span> : null}
+              </span>
+            </div>
           </li>
         );
       })}
@@ -421,3 +451,73 @@ function Stepper({ step, projectType }: { step: WizardStep; projectType: Project
   );
 }
 
+function SectionHeader({
+  icon,
+  eyebrow,
+  title,
+  description
+}: {
+  icon: ReactNode;
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mb-6 flex items-start gap-3">
+      <span className="sr-only">{eyebrow}. {title}</span>
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-warmBg">{icon}</div>
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-brand-primary">{eyebrow}</p>
+        <h2 className="mt-1 text-[22px] font-black leading-[30px] text-lava-text">{title}</h2>
+        <p className="mt-1 text-sm leading-6 text-lava-secondary">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function DeliverableCard({ title, label, children }: { title: string; label: string; children: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-lava-border bg-white p-5 shadow-sm">
+      <Badge tone="purple">{label}</Badge>
+      <h3 className="mt-4 text-lg font-black text-lava-text">{title}</h3>
+      <p className="mt-3 text-sm leading-6 text-lava-secondary">{children}</p>
+    </div>
+  );
+}
+
+function SummaryPanel({ form, inviteEmails, step }: { form: FormState; inviteEmails: string[]; step: WizardStep }) {
+  return (
+    <aside className="xl:sticky xl:top-[94px]">
+      <Card className="relative overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#FF5A2D,#20A99A,#5865F2)]" />
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-lava-muted">Live summary</p>
+        <h2 className="mt-2 text-xl font-black text-lava-text">{form.name || "프로젝트 이름"}</h2>
+        <p className="mt-2 line-clamp-4 text-sm leading-6 text-lava-secondary">
+          {form.originalIdea || "아이디어를 입력하면 이곳에 요약이 표시됩니다."}
+        </p>
+        <div className="mt-6 space-y-3">
+          <SummaryRow label="유형" value={form.type === "team" ? "팀 프로젝트" : "개인 프로젝트"} />
+          <SummaryRow label="기간" value={`${form.startDate || "시작일"} ~ ${form.endDate || "종료일"}`} />
+          <SummaryRow label="초대" value={form.type === "personal" ? "해당 없음" : `${inviteEmails.length}명`} />
+          <SummaryRow label="현재 단계" value={steps[step] ?? "진행 중"} />
+        </div>
+        <div className="mt-6 rounded-lg border border-lava-border bg-lava-raised p-4">
+          <p className="text-sm font-black text-lava-text">생성 예정 산출물</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge tone="purple">기능 명세서</Badge>
+            <Badge tone="gray">API 명세서</Badge>
+          </div>
+        </div>
+      </Card>
+    </aside>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-lava-border pb-3 last:border-b-0 last:pb-0">
+      <span className="text-xs font-bold text-lava-muted">{label}</span>
+      <span className="min-w-0 truncate text-sm font-black text-lava-text">{value}</span>
+    </div>
+  );
+}
