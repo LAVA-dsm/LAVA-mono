@@ -38,8 +38,14 @@ async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> 
         ...init.headers
       }
     });
-  } catch {
-    throw new Error("API 서버에 연결할 수 없어요. apps/api 서버와 NEXT_PUBLIC_API_BASE_URL을 확인해 주세요.");
+  } catch (err) {
+    console.error(
+      `[LAVA API Client Error] API 서버(URL: ${API_BASE_URL}) 연결에 실패했습니다.\n` +
+      `- apps/api 서버가 정상 구동 중인지 확인해 주세요.\n` +
+      `- 로컬 환경 변수 NEXT_PUBLIC_API_BASE_URL 설정을 체크해 주세요.`,
+      err
+    );
+    throw new Error("서버와의 연결이 일시적으로 원활하지 않습니다. 인터넷 연결 상태를 확인하시거나 잠시 후 다시 시도해 주세요.");
   }
 
   if (!response.ok) {

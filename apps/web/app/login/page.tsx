@@ -7,6 +7,7 @@ import { LogIn } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { FieldWrapper, Input } from "@/components/ui/field";
 
 export default function LoginPage() {
@@ -47,9 +48,7 @@ export default function LoginPage() {
         </div>
 
         {error ? (
-          <div role="alert" className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-brand-red">
-            {error}
-          </div>
+          <ErrorAlert message={error} />
         ) : null}
 
         <div className="space-y-5">

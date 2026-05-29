@@ -14,6 +14,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { FieldWrapper, Textarea } from "@/components/ui/field";
 import { apiClient } from "@/lib/api-client";
 
@@ -45,6 +46,7 @@ export function DocumentEditor({ projectId, documentType }: { projectId: string;
   const [isLoading, setIsLoading] = useState(parsedType.success);
   const [isSaving, setIsSaving] = useState(false);
   const [isAiEditing, setIsAiEditing] = useState(false);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   useEffect(() => {
     if (!type) {
@@ -77,7 +79,7 @@ export function DocumentEditor({ projectId, documentType }: { projectId: string;
     };
 
     void load();
-  }, [projectId, type]);
+  }, [router, projectId, type, retryTrigger]);
 
   const currentMeta = type ? documentMeta[type] : documentMeta.feature_spec;
   const isFeatureSpec = type === "feature_spec";
@@ -141,9 +143,10 @@ export function DocumentEditor({ projectId, documentType }: { projectId: string;
       <div className="mx-auto max-w-[1580px]">
         {isLoading ? <p className="text-sm text-lava-secondary">문서를 불러오는 중입니다.</p> : null}
         {error ? (
-          <div role="alert" className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-brand-red">
-            {error}
-          </div>
+          <ErrorAlert
+            message={error}
+            onRetry={type ? () => setRetryTrigger((prev) => prev + 1) : undefined}
+          />
         ) : null}
         {statusMessage ? (
           <div role="status" className="mb-5 rounded-md bg-green-50 px-4 py-3 text-sm font-semibold text-lava-success">

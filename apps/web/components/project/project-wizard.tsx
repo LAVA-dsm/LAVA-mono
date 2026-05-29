@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -226,6 +226,14 @@ export function ProjectWizard() {
                   type="date"
                   value={form.startDate}
                   onChange={(event) => updateField("startDate", event.target.value)}
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker();
+                    } catch (err) {
+                      console.warn("showPicker is not supported", err);
+                    }
+                  }}
+                  className="cursor-pointer"
                 />
               </FieldWrapper>
               <FieldWrapper label="종료일" hint="최대 365일까지 가능합니다.">
@@ -233,6 +241,14 @@ export function ProjectWizard() {
                   type="date"
                   value={form.endDate}
                   onChange={(event) => updateField("endDate", event.target.value)}
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker();
+                    } catch (err) {
+                      console.warn("showPicker is not supported", err);
+                    }
+                  }}
+                  className="cursor-pointer"
                 />
               </FieldWrapper>
             </div>
