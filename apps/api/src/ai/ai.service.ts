@@ -1,4 +1,4 @@
-﻿import { Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import OpenAI from "openai";
 import {
   FALLBACK_DOCUMENT_CONTENT,
@@ -84,12 +84,16 @@ export class AiService {
 
   async enhanceIdea(input: IdeaEnhanceInput, requestedByUserId: string): Promise<string> {
     const prompt = [
-      "사용자가 입력한 아이디어를 300자 이상 400자 이하의 단일 문단으로만 더 구체화하세요.",
-      "출력은 오직 증강된 아이디어 본문만 포함하세요.",
-      "요청자, 프로젝트명, 프로젝트 유형, 기간 같은 메타데이터는 절대 포함하지 마세요.",
-      "이후 행동 추천, 추가 질문, 다음 단계 안내 문구도 포함하지 마세요.",
-      "마크다운 제목, 목록, 코드블록, 줄바꿈 없이 하나의 자연스러운 문단으로만 작성하세요.",
-      "원문 아이디어의 의미는 유지하되, 기능, 사용자 흐름, 핵심 가치, 실행 방향을 더 구체화하세요.",
+      "사용자가 입력한 아이디어를 구체화하여 완성도 높은 프로젝트 개요를 작성해 주세요.",
+      "반드시 다음 5가지 항목을 마크다운 헤더(##)를 사용하여 구조화된 형태로 응답하세요.",
+      "1. ## 프로젝트 목적",
+      "2. ## 핵심 사용자",
+      "3. ## 주요 기능",
+      "4. ## 차별점",
+      "5. ## 예상 개발 범위",
+      "응답에는 마크다운 헤더와 각 항목의 구체적인 본문 텍스트만 포함해 주세요.",
+      "요청자, 프로젝트명, 프로젝트 유형, 기간 같은 메타데이터는 문서 상단에 작성하지 마세요.",
+      "이후 행동 추천, 추가 질문, 다음 단계 안내 등의 인사말이나 설명 문구는 일체 배제하세요.",
       `프로젝트명: ${input.name}`,
       `프로젝트 유형: ${input.type}`,
       `기간: ${input.startDate} ~ ${input.endDate}`,

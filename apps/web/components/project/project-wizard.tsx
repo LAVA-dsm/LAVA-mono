@@ -31,6 +31,7 @@ type FormState = {
   name: string;
   type: ProjectType;
   originalIdea: string;
+  enhancedIdea: string;
   ideaEnhancementUsed: boolean;
   startDate: string;
   endDate: string;
@@ -39,13 +40,17 @@ type FormState = {
 
 const steps = ["기본 정보", "멤버 초대", "AI 명세 생성", "최종 확인"];
 
+const getTodayString = () => new Date().toISOString().slice(0, 10);
+const getOneMonthLaterString = () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 const initialState: FormState = {
   name: "",
   type: "team",
   originalIdea: "",
+  enhancedIdea: "",
   ideaEnhancementUsed: false,
-  startDate: "",
-  endDate: "",
+  startDate: getTodayString(),
+  endDate: getOneMonthLaterString(),
   inviteEmailsText: ""
 };
 
@@ -116,6 +121,7 @@ export function ProjectWizard() {
       name: form.name,
       type: form.type,
       originalIdea: form.originalIdea,
+      enhancedIdea: form.ideaEnhancementUsed ? form.enhancedIdea : undefined,
       ideaEnhancementUsed: form.ideaEnhancementUsed,
       startDate: form.startDate,
       endDate: form.endDate,
@@ -133,6 +139,14 @@ export function ProjectWizard() {
     setIsEnhancing(true);
     setError(null);
     try {
+      if (!form.name.trim()) {
+        setError("프로젝트 이름을 입력해 주세요.");
+        return;
+      }
+      if (!form.startDate || !form.endDate) {
+        setError("시작일과 종료일을 입력해 주세요.");
+        return;
+      }
       if (!form.originalIdea.trim()) {
         setError("아이디어를 입력해 주세요.");
         return;
@@ -146,7 +160,7 @@ export function ProjectWizard() {
       });
       setForm((current) => ({
         ...current,
-        originalIdea: response.enhancedIdea,
+        enhancedIdea: response.enhancedIdea,
         ideaEnhancementUsed: true
       }));
     } catch (enhanceError) {
@@ -268,10 +282,19 @@ export function ProjectWizard() {
                 </FieldWrapper>
               </div>
               <div className="mt-5">
-                <FieldWrapper label="프로젝트 아이디어" hint={`${ideaLength}/${PROJECT_IDEA_MIN_LENGTH}자 이상`}>
+                <FieldWrapper
+                  label="프로젝트 아이디어"
+                  hint={`${form.ideaEnhancementUsed ? form.enhancedIdea.length : ideaLength}/${PROJECT_IDEA_MIN_LENGTH}자 이상`}
+                >
                   <Textarea
-                    value={form.originalIdea}
-                    onChange={(event) => updateField("originalIdea", event.target.value)}
+                    value={form.ideaEnhancementUsed ? form.enhancedIdea : form.originalIdea}
+                    onChange={(event) => {
+                      if (form.ideaEnhancementUsed) {
+                        updateField("enhancedIdea", event.target.value);
+                      } else {
+                        updateField("originalIdea", event.target.value);
+                      }
+                    }}
                     placeholder="어떤 문제를 해결하고 싶은지, 누가 사용할지, 꼭 들어가야 할 기능을 적어주세요."
                     className="min-h-[220px]"
                   />
@@ -290,7 +313,13 @@ export function ProjectWizard() {
               </div>
               {form.ideaEnhancementUsed ? (
                 <div className="mt-5 rounded-lg border border-brand-primary/30 bg-brand-warmBg p-4 text-sm font-semibold text-lava-secondary">
-                  AI가 아이디어를 현재 입력값에 반영했습니다. 아래 아이디어 칸의 내용이 바로 생성에 사용됩니다.
+                  <p className="mb-2">AI가 아이디어를 현재 입력값에 반영했습니다. 아래 아이디어 칸의 내용이 바로 생성에 사용됩니다.</p>
+                  <details className="mt-2 text-xs text-lava-muted">
+                    <summary className="cursor-pointer font-bold hover:text-brand-primary">내가 작성한 원본 아이디어 보기</summary>
+                    <p className="mt-2 whitespace-pre-wrap rounded bg-white p-2 border border-lava-border font-normal text-lava-text">
+                      {form.originalIdea}
+                    </p>
+                  </details>
                 </div>
               ) : null}
             </section>
