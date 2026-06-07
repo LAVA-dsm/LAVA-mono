@@ -40,24 +40,38 @@ export class EmailService {
     const from = process.env.SMTP_FROM || "LAVA <no-reply@lava.local>";
 
     if (process.env.SMTP_HOST && process.env.SMTP_PORT) {
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT),
-        secure: Number(process.env.SMTP_PORT) === 465,
-        auth: process.env.SMTP_USER
-          ? {
-              user: process.env.SMTP_USER,
-              pass: process.env.SMTP_PASS
-            }
-          : undefined
-      });
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: Number(process.env.SMTP_PORT),
+          secure: Number(process.env.SMTP_PORT) === 465,
+          auth: process.env.SMTP_USER
+            ? {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+              }
+            : undefined,
+          tls: {
+            rejectUnauthorized: false
+          }
+        });
 
-      await transporter.sendMail({
-        from,
-        to: input.to,
-        subject: input.subject,
-        text: input.text
-      });
+        await transporter.sendMail({
+          from,
+          to: input.to,
+          subject: input.subject,
+          text: input.text
+        });
+        this.logger.log(`Email successfully sent to ${input.to}`);
+      } catch (error) {
+        this.logger.error(
+          `SMTP email sending failed to ${input.to}: ${
+            error instanceof Error ? error.message : "unknown"
+          }`,
+          error instanceof Error ? error.stack : undefined
+        );
+        throw error;
+      }
       return;
     }
 
