@@ -16,34 +16,35 @@ export function ErrorAlert({ message, onRetry, details, className = "" }: ErrorA
   return (
     <div
       role="alert"
-      className={`mb-6 rounded-lg border border-red-100 bg-red-50/70 p-4 shadow-sm transition-all duration-300 ${className}`}
+      className={[
+        "mb-5 rounded-xl border border-[rgb(var(--c-red)/0.22)] bg-[rgb(var(--c-red)/0.10)] p-4",
+        "transition-all duration-300",
+        className
+      ].join(" ")}
     >
       <div className="flex items-start gap-3">
-        {/* 에러 경고 아이콘 - 색상에만 의존하지 않는 명확한 경고 시각화 */}
-        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-brand-red" aria-hidden="true" />
-        
-        {/* 에러 메시지 본문 */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-brand-red leading-relaxed break-keep">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-brand-red" aria-hidden="true" />
+
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium leading-relaxed text-brand-red">
             {message}
           </p>
-          
-          {/* 상세 정보 토글 (개발자 디버깅 보조용 접이식 아코디언) */}
+
           {details && (
             <div className="mt-2">
               <button
                 type="button"
                 onClick={() => setShowDetails(!showDetails)}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-lava-secondary hover:text-brand-red transition-colors focus:outline-none"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-lava-secondary transition-colors hover:text-brand-red focus:outline-none"
               >
-                <span>상세 정보 보기</span>
+                상세 정보
                 <ChevronDown
                   className={`h-3 w-3 transition-transform duration-200 ${showDetails ? "rotate-180" : ""}`}
                 />
               </button>
-              
+
               {showDetails && (
-                <pre className="mt-2 max-h-32 overflow-y-auto rounded-md bg-white border border-lava-border p-3 text-[11px] font-mono text-lava-secondary leading-relaxed whitespace-pre-wrap break-all shadow-inner">
+                <pre className="mt-2 max-h-28 overflow-y-auto rounded-lg border border-lava-border bg-lava-surface p-3 font-mono text-[11px] leading-relaxed text-lava-secondary">
                   {details}
                 </pre>
               )}
@@ -51,15 +52,14 @@ export function ErrorAlert({ message, onRetry, details, className = "" }: ErrorA
           )}
         </div>
 
-        {/* 다시 시도 액션 버튼 */}
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-brand-red shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-50 focus:outline-none"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[rgb(var(--c-red)/0.30)] bg-lava-surface px-2.5 py-1.5 text-xs font-semibold text-brand-red shadow-xs transition-colors hover:border-[rgb(var(--c-red)/0.40)] hover:bg-[rgb(var(--c-red)/0.12)] focus:outline-none"
           >
             <RefreshCw className="h-3 w-3" />
-            <span>다시 시도</span>
+            재시도
           </button>
         )}
       </div>

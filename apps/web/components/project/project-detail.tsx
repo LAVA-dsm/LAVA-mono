@@ -63,7 +63,8 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       const data = await apiClient.getProject(projectId);
       setProject(data);
     } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : "프로젝트를 불러오지 못했어요.";
+      const message =
+        loadError instanceof Error ? loadError.message : "프로젝트를 불러오지 못했어요.";
       if (message.includes("로그인이 필요")) {
         router.push(`/login?next=${encodeURIComponent(`/projects/${projectId}`)}`);
         return;
@@ -81,20 +82,35 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   return (
     <AppShell
       title={
-        <span className="text-base font-semibold text-lava-secondary">
-          내 프로젝트 <span className="px-2 text-lava-muted">›</span>
-          <span className="text-lava-text">{project?.name || "프로젝트"}</span>
+        <span className="flex items-center gap-1.5 text-[14px]">
+          <Link href="/" className="font-medium text-lava-muted transition-colors hover:text-lava-text">
+            대시보드
+          </Link>
+          <span className="text-lava-border">/</span>
+          <span className="font-semibold text-lava-text">
+            {project?.name ?? "프로젝트"}
+          </span>
         </span>
       }
     >
       <div className="mx-auto max-w-[1580px]">
-        {isLoading ? <p className="text-sm text-lava-secondary">프로젝트를 불러오는 중입니다.</p> : null}
-        {error ? (
-          <div role="alert" className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-brand-red">
+        {isLoading && (
+          <div className="flex items-center gap-2 py-8 text-[13px] text-lava-muted">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            프로젝트를 불러오는 중입니다.
+          </div>
+        )}
+        {error && (
+          <div
+            role="alert"
+            className="mb-5 rounded-xl border border-[rgb(var(--c-red)/0.22)] bg-[rgb(var(--c-red)/0.10)] px-4 py-3 text-[13px] font-medium text-brand-red"
+          >
             {error}
           </div>
-        ) : null}
-        {project ? <ProjectContent project={project} onProjectChange={setProject} /> : null}
+        )}
+        {project && (
+          <ProjectContent project={project} onProjectChange={setProject} />
+        )}
       </div>
     </AppShell>
   );
@@ -107,43 +123,46 @@ function ProjectContent({
   project: ProjectSummary;
   onProjectChange: (project: ProjectSummary) => void;
 }) {
-  const featureSpec = project.documents.find((document) => document.type === "feature_spec");
-  const apiSpec = project.documents.find((document) => document.type === "api_spec");
+  const featureSpec = project.documents.find((d) => d.type === "feature_spec");
+  const apiSpec = project.documents.find((d) => d.type === "api_spec");
   const isLeader = project.currentUserRole === "leader";
 
   return (
     <>
-      <Card className="relative overflow-hidden p-7">
-        <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#FF5A2D,#20A99A,#5865F2)]" />
+      {/* ── Project Header ────────────────────────────── */}
+      <Card className="relative overflow-hidden pad-7">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[30px] font-black leading-[1.18] text-lava-text sm:text-[36px]">{project.name}</h1>
-              <Badge tone="warning">진행중</Badge>
-              <Badge tone="purple">{project.schedule ? "일정 생성 완료" : "일정 생성 대기"}</Badge>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-[24px] font-bold tracking-tight text-lava-text sm:text-[28px]">
+                {project.name}
+              </h1>
+              <Badge tone={project.schedule ? "success" : "gray"}>
+                {project.schedule ? "일정 생성 완료" : "일정 생성 대기"}
+              </Badge>
             </div>
-            <p className="lava-text-balance mt-4 max-w-4xl text-sm leading-6 text-lava-secondary">
+            <p className="lava-text-balance mt-3 max-w-3xl text-[13.5px] leading-[1.65] text-lava-secondary">
               {project.enhancedIdea || project.originalIdea}
             </p>
-            <div className="mt-6 flex flex-wrap gap-3 text-sm text-lava-secondary">
-              <span className="inline-flex items-center gap-2 rounded-lg border border-lava-border bg-lava-raised px-3 py-2 font-semibold">
-                <Clock3 className="h-4 w-4" aria-hidden />
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <InfoChip icon={<Clock3 className="h-3.5 w-3.5" />}>
                 {project.startDate} ~ {project.endDate}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-lg border border-lava-border bg-lava-raised px-3 py-2 font-semibold">
-                <Users className="h-4 w-4" aria-hidden />
-                {project.type === "team" ? `${project.members.length}명 참여 · ${project.inviteCount}명 대기` : "개인 프로젝트"}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-lg border border-lava-border bg-lava-raised px-3 py-2 font-semibold">
-                <FileText className="h-4 w-4" aria-hidden />
+              </InfoChip>
+              <InfoChip icon={<Users className="h-3.5 w-3.5" />}>
+                {project.type === "team"
+                  ? `${project.members.length}명 참여 · ${project.inviteCount}명 대기`
+                  : "개인 프로젝트"}
+              </InfoChip>
+              <InfoChip icon={<FileText className="h-3.5 w-3.5" />}>
                 AI 문서 {project.documents.length}/2 생성 완료
-              </span>
+              </InfoChip>
             </div>
           </div>
         </div>
       </Card>
 
-      <section className="mt-8 grid gap-6 xl:grid-cols-[1fr_420px]">
+      {/* ── Content Grid ──────────────────────────────── */}
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_400px]">
         <div className="space-y-6">
           <DocumentsSection
             projectId={project.id}
@@ -152,13 +171,22 @@ function ProjectContent({
           />
           <ScheduleSection project={project} onProjectChange={onProjectChange} />
         </div>
-        <div className="space-y-6">
+        <div className="space-y-5">
           <ParticipationSection project={project} onProjectChange={onProjectChange} />
-          {isLeader ? <InvitationStatusSection project={project} /> : null}
+          {isLeader && <InvitationStatusSection project={project} />}
           <ProjectManagementSection project={project} />
         </div>
       </section>
     </>
+  );
+}
+
+function InfoChip({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-xl border border-lava-border bg-lava-raised px-3 py-1.5 text-[12.5px] font-medium text-lava-secondary">
+      <span className="text-lava-muted">{icon}</span>
+      {children}
+    </span>
   );
 }
 
@@ -173,37 +201,36 @@ function DocumentsSection({
 }) {
   return (
     <section>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-brand-primary" aria-hidden />
-            <h2 className="text-[22px] font-black leading-[30px] text-lava-text">프로젝트 산출물 문서</h2>
-          </div>
-          <p className="mt-1 text-sm text-lava-secondary">AI 초안을 열고 바로 편집할 수 있습니다.</p>
-        </div>
-      </div>
-      <div className="grid gap-6 xl:grid-cols-3">
+      <SectionHeader
+        icon={<FileText className="h-4 w-4" />}
+        title="프로젝트 산출물 문서"
+        description="AI 초안을 열고 바로 편집할 수 있습니다."
+      />
+      <div className="grid gap-4 xl:grid-cols-3">
         <DocumentCard
-          icon={<ListChecks className="h-7 w-7 text-lava-purple" aria-hidden />}
+          icon={<ListChecks className="h-6 w-6 text-lava-purple" />}
+          iconBg="bg-[rgb(var(--c-purple)/0.12)]"
           title="기능 명세서"
-          description="앱의 핵심 비즈니스 로직과 화면별 상세 기능 요구사항이 정리된 문서입니다."
-          meta={featureSpecUpdatedAt ? `최근 수정: ${formatDate(featureSpecUpdatedAt)}` : "생성 대기"}
+          description="핵심 비즈니스 로직과 화면별 상세 기능 요구사항이 정리된 문서입니다."
+          meta={featureSpecUpdatedAt ? `최근 수정 ${formatDate(featureSpecUpdatedAt)}` : "생성 대기"}
           label="Markdown"
           href={`/projects/${projectId}/documents/feature_spec`}
         />
         <DocumentCard
-          icon={<FileText className="h-7 w-7 text-brand-primary" aria-hidden />}
+          icon={<FileText className="h-6 w-6 text-brand-primary" />}
+          iconBg="bg-[rgb(var(--c-brand)/0.12)]"
           title="API 명세서"
-          description="프론트엔드와 백엔드 통신을 위한 엔드포인트, Request/Response 규격이 정리된 문서입니다."
-          meta={apiSpecUpdatedAt ? `최근 수정: ${formatDate(apiSpecUpdatedAt)}` : "생성 대기"}
+          description="엔드포인트와 Request / Response 규격이 정리된 REST API 문서입니다."
+          meta={apiSpecUpdatedAt ? `최근 수정 ${formatDate(apiSpecUpdatedAt)}` : "생성 대기"}
           label="REST"
           href={`/projects/${projectId}/documents/api_spec`}
         />
         <DocumentCard
-          icon={<CalendarCheck className="h-7 w-7 text-lava-success" aria-hidden />}
+          icon={<CalendarCheck className="h-6 w-6 text-lava-success" />}
+          iconBg="bg-[rgb(var(--c-success)/0.12)]"
           title="개발 일정표"
-          description="팀원 참여 정보를 반영해 역할 분담, 작업, 회의 일정을 날짜 단위로 관리합니다."
-          meta="2차 스프린트"
+          description="팀원 참여 정보를 반영해 역할 분담과 작업 일정을 날짜 단위로 관리합니다."
+          meta="일정 섹션에서 관리"
           label="Calendar"
         />
       </div>
@@ -213,6 +240,7 @@ function DocumentsSection({
 
 function DocumentCard({
   icon,
+  iconBg,
   title,
   description,
   meta,
@@ -220,6 +248,7 @@ function DocumentCard({
   href
 }: {
   icon: ReactNode;
+  iconBg: string;
   title: string;
   description: string;
   meta: string;
@@ -227,26 +256,52 @@ function DocumentCard({
   href?: string;
 }) {
   return (
-    <Card className="group relative min-h-[310px] overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:border-brand-primary">
-      <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-lg bg-brand-warmBg p-3 transition group-hover:scale-105">
+    <Card className="group flex min-h-[260px] flex-col overflow-hidden p-5 transition-colors duration-150 hover:border-lava-borderStrong">
+      <div className={`mb-5 flex h-11 w-11 items-center justify-center rounded-xl ${iconBg}`}>
         {icon}
       </div>
-      <h3 className="text-[18px] font-black leading-[26px] text-lava-text">{title}</h3>
-      <p className="mt-3 min-h-12 text-sm leading-6 text-lava-secondary">{description}</p>
-      <div className="mt-6 flex items-center justify-between border-t border-lava-border pt-4">
-        <span className="text-xs font-semibold text-lava-secondary">{meta}</span>
+      <h3 className="text-[15px] font-bold tracking-tight text-lava-text">{title}</h3>
+      <p className="mt-2 flex-1 text-[12.5px] leading-[1.6] text-lava-secondary">
+        {description}
+      </p>
+      <div className="mt-5 flex items-center justify-between border-t border-lava-border pt-4">
+        <span className="text-[11.5px] text-lava-muted">{meta}</span>
         <Badge>{label}</Badge>
       </div>
-      {href ? (
+      {href && (
         <Link
           href={href}
-          className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-lava-borderStrong bg-white px-5 text-sm font-black text-lava-text transition hover:border-brand-primary hover:text-brand-primary"
+          className="mt-4 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-lava-borderStrong bg-lava-surface text-[13px] font-semibold text-lava-text transition-all hover:border-brand-primary/50 hover:text-brand-primary"
         >
-          열기
-          <ArrowRight className="h-4 w-4" aria-hidden />
+          문서 열기
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
         </Link>
-      ) : null}
+      )}
     </Card>
+  );
+}
+
+function SectionHeader({
+  icon,
+  title,
+  description
+}: {
+  icon: ReactNode;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="mb-4 flex items-center gap-2.5">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-lava-raised text-lava-secondary">
+        {icon}
+      </div>
+      <div>
+        <h2 className="text-[16px] font-bold tracking-tight text-lava-text">{title}</h2>
+        {description && (
+          <p className="mt-[1px] text-[12px] text-lava-muted">{description}</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -257,11 +312,13 @@ function ParticipationSection({
   project: ProjectSummary;
   onProjectChange: (project: ProjectSummary) => void;
 }) {
-  const myMember = project.members.find((member) => member.userId === project.currentUserId);
+  const myMember = project.members.find((m) => m.userId === project.currentUserId);
   const [major, setMajor] = useState(myMember?.major || "");
   const [techStacksText, setTechStacksText] = useState(myMember?.techStacks.join(", ") || "");
   const [availableTimes, setAvailableTimes] = useState<AvailableTime[]>(
-    myMember?.availableTimes.length ? myMember.availableTimes : [{ dayOfWeek: "mon", startTime: "19:00", endTime: "21:00" }]
+    myMember?.availableTimes.length
+      ? myMember.availableTimes
+      : [{ dayOfWeek: "mon", startTime: "19:00", endTime: "21:00" }]
   );
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -284,33 +341,60 @@ function ParticipationSection({
   };
 
   return (
-    <Card>
-      <h2 className="text-[18px] font-black leading-[26px] text-lava-text">내 참여 정보</h2>
-      <p className="mt-2 text-sm leading-6 text-lava-secondary">AI 일정 생성에 사용하는 기본 정보입니다.</p>
-      {error ? <p className="mt-4 text-sm font-semibold text-brand-red">{error}</p> : null}
-      <div className="mt-5 space-y-4">
+    <Card className="p-5">
+      <h2 className="text-[15px] font-bold tracking-tight text-lava-text">내 참여 정보</h2>
+      <p className="mt-1 text-[12.5px] text-lava-secondary">
+        AI 일정 생성에 사용하는 기본 정보입니다.
+      </p>
+      {error && (
+        <p className="mt-3 text-[12.5px] font-medium text-brand-red">{error}</p>
+      )}
+      <div className="mt-4 space-y-4">
         <FieldWrapper label="전공">
-          <Input value={major} onChange={(event) => setMajor(event.target.value)} placeholder="컴퓨터공학" />
+          <Input
+            value={major}
+            onChange={(e) => setMajor(e.target.value)}
+            placeholder="컴퓨터공학"
+          />
         </FieldWrapper>
         <FieldWrapper label="기술 스택">
-          <Input value={techStacksText} onChange={(event) => setTechStacksText(event.target.value)} placeholder="React, NestJS" />
+          <Input
+            value={techStacksText}
+            onChange={(e) => setTechStacksText(e.target.value)}
+            placeholder="React, NestJS, TypeScript"
+          />
         </FieldWrapper>
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-semibold text-lava-text">참여 가능 시간</span>
+            <span className="text-[13px] font-semibold text-lava-text">참여 가능 시간</span>
             <Button
               type="button"
               variant="secondary"
-              className="min-h-9 px-3"
-              icon={<Plus className="h-4 w-4" />}
-              onClick={() => setAvailableTimes((current) => [...current, { dayOfWeek: "mon", startTime: "19:00", endTime: "21:00" }])}
+              size="sm"
+              icon={<Plus className="h-3.5 w-3.5" />}
+              onClick={() =>
+                setAvailableTimes((cur) => [
+                  ...cur,
+                  { dayOfWeek: "mon", startTime: "19:00", endTime: "21:00" }
+                ])
+              }
             >
               추가
             </Button>
           </div>
-          <AvailabilityEditor availableTimes={availableTimes} onChange={setAvailableTimes} />
+          <AvailabilityEditor
+            availableTimes={availableTimes}
+            onChange={setAvailableTimes}
+          />
         </div>
-        <Button type="button" className="w-full" onClick={save} disabled={isSaving} icon={<Save className="h-4 w-4" />}>
+        <Button
+          type="button"
+          className="w-full"
+          onClick={save}
+          disabled={isSaving}
+          loading={isSaving}
+          icon={<Save className="h-4 w-4" />}
+        >
           {isSaving ? "저장 중" : "참여 정보 저장"}
         </Button>
       </div>
@@ -325,36 +409,54 @@ function AvailabilityEditor({
   availableTimes: AvailableTime[];
   onChange: (value: AvailableTime[]) => void;
 }) {
-  const update = <Key extends keyof AvailableTime>(index: number, key: Key, value: AvailableTime[Key]) => {
-    onChange(availableTimes.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
+  const update = <Key extends keyof AvailableTime>(
+    index: number,
+    key: Key,
+    value: AvailableTime[Key]
+  ) => {
+    onChange(
+      availableTimes.map((item, i) => (i === index ? { ...item, [key]: value } : item))
+    );
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {availableTimes.map((time, index) => (
-        <div key={`${time.dayOfWeek}-${index}`} className="grid gap-2 rounded-lg border border-lava-border bg-lava-raised p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+        <div
+          key={`${time.dayOfWeek}-${index}`}
+          className="grid gap-2 rounded-xl border border-lava-border bg-lava-raised p-3 md:grid-cols-[1fr_1fr_1fr_auto]"
+        >
           <select
-            className="h-11 rounded-lg border border-lava-borderStrong bg-white px-3 text-sm text-lava-text shadow-sm"
+            className="h-10 rounded-[10px] border border-lava-borderStrong bg-lava-surface px-3 text-[13px] text-lava-text shadow-sm focus:border-brand-primary focus:outline-none"
             value={time.dayOfWeek}
-            onChange={(event) => update(index, "dayOfWeek", event.target.value as DayOfWeek)}
+            onChange={(e) => update(index, "dayOfWeek", e.target.value as DayOfWeek)}
           >
-            {dayOptions.map((day) => (
-              <option key={day.value} value={day.value}>
-                {day.label}
+            {dayOptions.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
               </option>
             ))}
           </select>
-          <Input type="time" value={time.startTime} onChange={(event) => update(index, "startTime", event.target.value)} />
-          <Input type="time" value={time.endTime} onChange={(event) => update(index, "endTime", event.target.value)} />
+          <Input
+            type="time"
+            value={time.startTime}
+            onChange={(e) => update(index, "startTime", e.target.value)}
+          />
+          <Input
+            type="time"
+            value={time.endTime}
+            onChange={(e) => update(index, "endTime", e.target.value)}
+          />
           <Button
             type="button"
             variant="ghost"
-            className="min-h-11 px-3 text-brand-red"
-            onClick={() => onChange(availableTimes.filter((_, itemIndex) => itemIndex !== index))}
+            size="sm"
+            className="h-10 px-2.5 text-brand-red hover:bg-[rgb(var(--c-red)/0.12)]"
+            onClick={() => onChange(availableTimes.filter((_, i) => i !== index))}
             disabled={availableTimes.length === 1}
-            aria-label="참여 가능 시간 삭제"
+            aria-label="삭제"
           >
-            <Trash2 className="h-4 w-4" aria-hidden />
+            <Trash2 className="h-3.5 w-3.5" aria-hidden />
           </Button>
         </div>
       ))}
@@ -364,20 +466,33 @@ function AvailabilityEditor({
 
 function InvitationStatusSection({ project }: { project: ProjectSummary }) {
   return (
-    <Card>
-      <h2 className="text-[18px] font-black leading-[26px] text-lava-text">초대 상태</h2>
-      <div className="mt-5 space-y-3">
+    <Card className="p-5">
+      <h2 className="text-[15px] font-bold tracking-tight text-lava-text">초대 상태</h2>
+      <div className="mt-4 space-y-2.5">
         {project.invitations.length ? (
-          project.invitations.map((invitation) => (
-            <div key={invitation.id} className="flex items-center justify-between gap-3 rounded-lg border border-lava-border bg-white px-3 py-3">
-              <span className="truncate text-sm font-bold text-lava-text">{invitation.email}</span>
-              <Badge tone={invitation.status === "pending" ? "warning" : invitation.status === "accepted" ? "success" : "gray"}>
-                {formatInvitationStatus(invitation.status)}
+          project.invitations.map((inv) => (
+            <div
+              key={inv.id}
+              className="flex items-center justify-between gap-3 rounded-xl border border-lava-border bg-lava-surface px-3 py-2.5"
+            >
+              <span className="truncate text-[13px] font-medium text-lava-text">
+                {inv.email}
+              </span>
+              <Badge
+                tone={
+                  inv.status === "pending"
+                    ? "warning"
+                    : inv.status === "accepted"
+                    ? "success"
+                    : "gray"
+                }
+              >
+                {formatInvitationStatus(inv.status)}
               </Badge>
             </div>
           ))
         ) : (
-          <p className="text-sm text-lava-secondary">초대된 멤버가 없습니다.</p>
+          <p className="text-[12.5px] text-lava-muted">초대된 멤버가 없습니다.</p>
         )}
       </div>
     </Card>
@@ -388,11 +503,13 @@ function ProjectManagementSection({ project }: { project: ProjectSummary }) {
   const router = useRouter();
   const isLeader = project.currentUserRole === "leader";
   const newLeaderCandidates = project.members.filter(
-    (member) => member.status === "accepted" && member.userId !== project.currentUserId
+    (m) => m.status === "accepted" && m.userId !== project.currentUserId
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
-  const [newLeaderUserId, setNewLeaderUserId] = useState(newLeaderCandidates[0]?.userId || "");
+  const [newLeaderUserId, setNewLeaderUserId] = useState(
+    newLeaderCandidates[0]?.userId || ""
+  );
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -402,8 +519,8 @@ function ProjectManagementSection({ project }: { project: ProjectSummary }) {
     try {
       await apiClient.deleteProject(project.id);
       router.push("/");
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "프로젝트 삭제에 실패했어요.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "프로젝트 삭제에 실패했어요.");
     } finally {
       setIsBusy(false);
     }
@@ -415,103 +532,124 @@ function ProjectManagementSection({ project }: { project: ProjectSummary }) {
     try {
       await apiClient.leaveProject(project.id, isLeader ? { newLeaderUserId } : {});
       router.push("/");
-    } catch (leaveError) {
-      setError(leaveError instanceof Error ? leaveError.message : "프로젝트 탈퇴에 실패했어요.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "프로젝트 탈퇴에 실패했어요.");
     } finally {
       setIsBusy(false);
     }
   };
 
   return (
-    <Card>
-      <h2 className="text-[18px] font-black leading-[26px] text-lava-text">프로젝트 관리</h2>
-      <p className="mt-2 text-sm leading-6 text-lava-secondary">
+    <Card className="p-5">
+      <h2 className="text-[15px] font-bold tracking-tight text-lava-text">프로젝트 관리</h2>
+      <p className="mt-1 text-[12.5px] text-lava-secondary">
         삭제와 탈퇴는 프로젝트 접근 권한에 바로 영향을 줍니다.
       </p>
+      {error && (
+        <p className="mt-3 text-[12.5px] font-medium text-brand-red">{error}</p>
+      )}
 
-      {error ? <p className="mt-4 text-sm font-semibold text-brand-red">{error}</p> : null}
-
-      <div className="mt-5 space-y-4">
-        <div className="rounded-lg border border-lava-border bg-lava-raised p-4">
+      <div className="mt-4 space-y-3">
+        {/* Leave */}
+        <div className="rounded-xl border border-lava-border bg-lava-raised p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-bold text-lava-text">프로젝트 나가기</p>
-              <p className="mt-1 text-xs leading-5 text-lava-secondary">
-                {isLeader ? "새 리더를 지정한 뒤 나갈 수 있습니다." : "나가면 내 프로젝트 목록에서 사라집니다."}
+              <p className="text-[13px] font-semibold text-lava-text">프로젝트 나가기</p>
+              <p className="mt-0.5 text-[12px] text-lava-muted">
+                {isLeader
+                  ? "새 리더를 지정한 뒤 나갈 수 있습니다."
+                  : "나가면 내 프로젝트 목록에서 사라집니다."}
               </p>
             </div>
             <Button
               type="button"
               variant="secondary"
+              size="sm"
               className="text-brand-red"
-              onClick={() => setShowLeaveConfirm((current) => !current)}
-              icon={<LogOut className="h-4 w-4" aria-hidden />}
+              onClick={() => setShowLeaveConfirm((v) => !v)}
+              icon={<LogOut className="h-3.5 w-3.5" />}
             >
               나가기
             </Button>
           </div>
-
-          {showLeaveConfirm ? (
+          {showLeaveConfirm && (
             <div className="mt-4 space-y-3 border-t border-lava-border pt-4">
-              {isLeader ? (
+              {isLeader && (
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-lava-text">새 리더</label>
+                  <label className="mb-2 block text-[13px] font-semibold text-lava-text">
+                    새 리더
+                  </label>
                   <select
-                    className="h-11 w-full rounded-lg border border-lava-borderStrong bg-white px-3 text-sm text-lava-text shadow-sm"
+                    className="h-10 w-full rounded-[10px] border border-lava-borderStrong bg-lava-surface px-3 text-[13px] text-lava-text shadow-sm focus:border-brand-primary focus:outline-none"
                     value={newLeaderUserId}
-                    onChange={(event) => setNewLeaderUserId(event.target.value)}
+                    onChange={(e) => setNewLeaderUserId(e.target.value)}
                   >
-                    {newLeaderCandidates.map((member) => (
-                      <option key={member.userId} value={member.userId}>
-                        {member.name} ({member.email})
+                    {newLeaderCandidates.map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.name} ({m.email})
                       </option>
                     ))}
                   </select>
-                  {!newLeaderCandidates.length ? (
-                    <p className="mt-2 text-xs font-semibold text-brand-red">
+                  {!newLeaderCandidates.length && (
+                    <p className="mt-2 text-[12px] font-medium text-brand-red">
                       참여 중인 다른 멤버가 없어 리더 탈퇴를 진행할 수 없습니다.
                     </p>
-                  ) : null}
+                  )}
                 </div>
-              ) : null}
+              )}
               <Button
                 type="button"
                 variant="danger"
+                size="sm"
                 onClick={leaveProject}
                 disabled={isBusy || (isLeader && !newLeaderUserId)}
+                loading={isBusy}
               >
-                {isBusy ? "처리 중" : "프로젝트 나가기 확인"}
+                {isBusy ? "처리 중" : "나가기 확인"}
               </Button>
             </div>
-          ) : null}
+          )}
         </div>
 
-        {isLeader ? (
-          <div className="rounded-lg border border-red-100 bg-red-50/75 p-4">
+        {/* Delete (leader only) */}
+        {isLeader && (
+          <div className="rounded-xl border border-[rgb(var(--c-red)/0.22)] bg-[rgb(var(--c-red)/0.10)] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-bold text-brand-red">프로젝트 삭제</p>
-                <p className="mt-1 text-xs leading-5 text-brand-red">삭제한 프로젝트는 목록과 상세 화면에서 더 이상 열 수 없습니다.</p>
+                <p className="text-[13px] font-semibold text-brand-red">프로젝트 삭제</p>
+                <p className="mt-0.5 text-[12px] text-brand-red/70">
+                  삭제한 프로젝트는 복구할 수 없습니다.
+                </p>
               </div>
               <Button
                 type="button"
                 variant="danger"
-                onClick={() => setShowDeleteConfirm((current) => !current)}
-                icon={<Trash2 className="h-4 w-4" aria-hidden />}
+                size="sm"
+                onClick={() => setShowDeleteConfirm((v) => !v)}
+                icon={<Trash2 className="h-3.5 w-3.5" />}
               >
                 삭제
               </Button>
             </div>
-            {showDeleteConfirm ? (
-              <div className="mt-4 border-t border-red-100 pt-4">
-                <p className="mb-3 text-sm font-semibold text-brand-red">프로젝트를 삭제할까요?</p>
-                <Button type="button" variant="danger" onClick={deleteProject} disabled={isBusy}>
-                  {isBusy ? "삭제 중" : "프로젝트 삭제 확인"}
+            {showDeleteConfirm && (
+              <div className="mt-4 border-t border-[rgb(var(--c-red)/0.22)] pt-4">
+                <p className="mb-3 text-[13px] font-semibold text-brand-red">
+                  정말 삭제하시겠어요?
+                </p>
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  onClick={deleteProject}
+                  disabled={isBusy}
+                  loading={isBusy}
+                >
+                  {isBusy ? "삭제 중" : "삭제 확인"}
                 </Button>
               </div>
-            ) : null}
+            )}
           </div>
-        ) : null}
+        )}
       </div>
     </Card>
   );
@@ -537,14 +675,14 @@ function ScheduleSection({
   }, [project.schedule]);
 
   const acceptedMembers = useMemo(
-    () => project.members.filter((member) => member.status === "accepted"),
+    () => project.members.filter((m) => m.status === "accepted"),
     [project.members]
   );
 
-  const syncProjectSchedule = (nextSchedule: ProjectScheduleSummary) => {
-    setSchedule(nextSchedule);
-    setItems(nextSchedule.items);
-    onProjectChange({ ...project, schedule: nextSchedule });
+  const syncProjectSchedule = (next: ProjectScheduleSummary) => {
+    setSchedule(next);
+    setItems(next.items);
+    onProjectChange({ ...project, schedule: next });
   };
 
   const generate = async () => {
@@ -552,8 +690,8 @@ function ScheduleSection({
     setError(null);
     try {
       syncProjectSchedule(await apiClient.generateSchedule(project.id));
-    } catch (generateError) {
-      setError(generateError instanceof Error ? generateError.message : "일정 생성에 실패했어요.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "일정 생성에 실패했어요.");
     } finally {
       setIsBusy(false);
     }
@@ -564,8 +702,8 @@ function ScheduleSection({
     setError(null);
     try {
       syncProjectSchedule(await apiClient.updateSchedule(project.id, { items }));
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "일정 저장에 실패했어요.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "일정 저장에 실패했어요.");
     } finally {
       setIsBusy(false);
     }
@@ -576,61 +714,97 @@ function ScheduleSection({
       setError("AI 일정 수정 요청을 입력해 주세요.");
       return;
     }
-
     setIsBusy(true);
     setError(null);
     try {
       syncProjectSchedule(await apiClient.editScheduleWithAi(project.id, { prompt: aiPrompt }));
       setAiPrompt("");
-    } catch (editError) {
-      setError(editError instanceof Error ? editError.message : "AI 일정 수정에 실패했어요.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI 일정 수정에 실패했어요.");
     } finally {
       setIsBusy(false);
     }
   };
 
-  const updateItem = <Key extends keyof ScheduleItemInput>(index: number, key: Key, value: ScheduleItemInput[Key]) => {
-    setItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
+  const updateItem = <Key extends keyof ScheduleItemInput>(
+    index: number,
+    key: Key,
+    value: ScheduleItemInput[Key]
+  ) => {
+    setItems((cur) =>
+      cur.map((item, i) => (i === index ? { ...item, [key]: value } : item))
+    );
   };
 
   return (
     <section>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <CalendarCheck className="h-5 w-5 text-brand-primary" aria-hidden />
-          <h2 className="text-[22px] font-black leading-[30px] text-lava-text">프로젝트 일정</h2>
-        </div>
-        {isLeader ? (
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <SectionHeader
+          icon={<CalendarCheck className="h-4 w-4" />}
+          title="프로젝트 일정"
+          description="AI로 일정을 자동 생성하거나 직접 편집할 수 있습니다."
+        />
+        {isLeader && (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={generate} disabled={isBusy} icon={isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={generate}
+              disabled={isBusy}
+              loading={isBusy}
+              icon={!isBusy ? <Sparkles className="h-3.5 w-3.5" /> : undefined}
+            >
               AI 일정 생성
             </Button>
-            <Button type="button" variant="secondary" onClick={save} disabled={isBusy || !items.length} icon={<Save className="h-4 w-4" />}>
-              일정 저장
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={save}
+              disabled={isBusy || !items.length}
+              icon={<Save className="h-3.5 w-3.5" />}
+            >
+              저장
             </Button>
           </div>
-        ) : null}
+        )}
       </div>
 
-      <Card className="overflow-hidden">
-        {error ? (
-          <div role="alert" className="mb-5 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-brand-red">
+      <Card className="overflow-hidden p-5">
+        {error && (
+          <div
+            role="alert"
+            className="mb-5 rounded-xl border border-[rgb(var(--c-red)/0.22)] bg-[rgb(var(--c-red)/0.10)] px-4 py-3 text-[13px] font-medium text-brand-red"
+          >
             {error}
           </div>
-        ) : null}
+        )}
 
         {!items.length ? (
-          <p className="text-sm leading-6 text-lava-secondary">생성된 일정이 없습니다.</p>
+          <div className="py-6 text-center">
+            <CalendarCheck className="mx-auto mb-3 h-8 w-8 text-lava-muted" />
+            <p className="text-[13.5px] font-semibold text-lava-text">
+              생성된 일정이 없습니다.
+            </p>
+            <p className="mt-1.5 text-[12.5px] text-lava-muted">
+              AI 일정 생성 버튼을 눌러 자동으로 일정을 만들어 보세요.
+            </p>
+          </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {items.map((item, index) => (
-              <div key={item.id ?? index} className="rounded-lg border border-lava-border bg-white p-4 shadow-sm">
+              <div
+                key={item.id ?? index}
+                className="rounded-xl border border-lava-border bg-lava-surface p-4"
+              >
                 {isLeader ? (
                   <EditableScheduleItem
                     item={item}
                     members={acceptedMembers}
                     onChange={(key, value) => updateItem(index, key, value)}
-                    onDelete={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    onDelete={() =>
+                      setItems((cur) => cur.filter((_, i) => i !== index))
+                    }
                   />
                 ) : (
                   <ReadOnlyScheduleItem item={item} members={acceptedMembers} />
@@ -640,14 +814,15 @@ function ScheduleSection({
           </div>
         )}
 
-        {isLeader ? (
-          <div className="mt-5 flex flex-wrap gap-3">
+        {isLeader && (
+          <div className="mt-4">
             <Button
               type="button"
               variant="secondary"
+              size="sm"
               onClick={() =>
-                setItems((current) => [
-                  ...current,
+                setItems((cur) => [
+                  ...cur,
                   {
                     title: "",
                     type: "task",
@@ -658,23 +833,37 @@ function ScheduleSection({
                   }
                 ])
               }
-              icon={<Plus className="h-4 w-4" />}
+              icon={<Plus className="h-3.5 w-3.5" />}
             >
               일정 추가
             </Button>
           </div>
-        ) : null}
+        )}
 
-        {isLeader && schedule ? (
-          <div className="mt-8 rounded-lg border border-lava-border bg-lava-raised p-4">
-            <FieldWrapper label="AI 일정 수정 요청">
-              <Textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="예: 회의 일정을 주말 대신 평일 저녁으로 조정해줘." />
+        {isLeader && schedule && (
+          <div className="mt-6 rounded-xl border border-lava-border bg-lava-raised p-4">
+            <p className="mb-3 text-[13px] font-semibold text-lava-text">AI 일정 수정 요청</p>
+            <FieldWrapper label="" hint="예: 회의 일정을 주말 대신 평일 저녁으로 조정해줘.">
+              <Textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="어떻게 일정을 조정할까요?"
+                className="min-h-[80px]"
+              />
             </FieldWrapper>
-            <Button type="button" className="mt-3" onClick={aiEdit} disabled={isBusy || !aiPrompt.trim()} icon={<Sparkles className="h-4 w-4" />}>
+            <Button
+              type="button"
+              size="sm"
+              className="mt-3"
+              onClick={aiEdit}
+              disabled={isBusy || !aiPrompt.trim()}
+              loading={isBusy}
+              icon={!isBusy ? <Sparkles className="h-3.5 w-3.5" /> : undefined}
+            >
               AI로 일정 수정
             </Button>
           </div>
-        ) : null}
+        )}
       </Card>
     </section>
   );
@@ -692,72 +881,115 @@ function EditableScheduleItem({
   onDelete: () => void;
 }) {
   const toggleAssignee = (userId: string) => {
-    const nextAssignees = item.assigneeUserIds.includes(userId)
-      ? item.assigneeUserIds.filter((assigneeId) => assigneeId !== userId)
+    const next = item.assigneeUserIds.includes(userId)
+      ? item.assigneeUserIds.filter((id) => id !== userId)
       : [...item.assigneeUserIds, userId];
-    onChange("assigneeUserIds", nextAssignees);
+    onChange("assigneeUserIds", next);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-[1fr_160px_auto]">
-        <Input value={item.title} onChange={(event) => onChange("title", event.target.value)} placeholder="일정 제목" />
+    <div className="space-y-3">
+      <div className="grid gap-2.5 md:grid-cols-[1fr_140px_auto]">
+        <Input
+          value={item.title}
+          onChange={(e) => onChange("title", e.target.value)}
+          placeholder="일정 제목"
+        />
         <select
-          className="h-11 rounded-lg border border-lava-borderStrong bg-white px-3 text-sm text-lava-text shadow-sm"
+          className="h-10 rounded-[10px] border border-lava-borderStrong bg-lava-surface px-3 text-[13px] text-lava-text shadow-sm focus:border-brand-primary focus:outline-none"
           value={item.type}
-          onChange={(event) => onChange("type", event.target.value as ScheduleItemType)}
+          onChange={(e) => onChange("type", e.target.value as ScheduleItemType)}
         >
-          {scheduleTypes.map((type) => (
-            <option key={type.value} value={type.value}>
-              {type.label}
+          {scheduleTypes.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
             </option>
           ))}
         </select>
-        <Button type="button" variant="ghost" className="min-h-11 px-3 text-brand-red" onClick={onDelete} aria-label="일정 삭제">
-          <Trash2 className="h-4 w-4" aria-hidden />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-10 px-2.5 text-brand-red hover:bg-[rgb(var(--c-red)/0.12)]"
+          onClick={onDelete}
+          aria-label="일정 삭제"
+        >
+          <Trash2 className="h-3.5 w-3.5" aria-hidden />
         </Button>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <Input type="date" value={item.startDate} onChange={(event) => onChange("startDate", event.target.value)} />
-        <Input type="date" value={item.endDate} onChange={(event) => onChange("endDate", event.target.value)} />
+      <div className="grid gap-2.5 md:grid-cols-2">
+        <Input
+          type="date"
+          value={item.startDate}
+          onChange={(e) => onChange("startDate", e.target.value)}
+        />
+        <Input
+          type="date"
+          value={item.endDate}
+          onChange={(e) => onChange("endDate", e.target.value)}
+        />
       </div>
-      <Textarea value={item.description} onChange={(event) => onChange("description", event.target.value)} placeholder="상세 설명" className="min-h-24" />
-      <div className="flex flex-wrap gap-2">
-        {members.map((member) => (
-          <button
-            key={member.userId}
-            type="button"
-            onClick={() => toggleAssignee(member.userId)}
-          className={`rounded-full border px-3 py-1 text-xs font-bold transition ${
-            item.assigneeUserIds.includes(member.userId)
-              ? "border-brand-primary/30 bg-brand-warmBg text-brand-primary"
-              : "border-lava-border bg-gray-100 text-lava-secondary hover:border-brand-primary hover:text-brand-primary"
-          }`}
-          >
-            {member.name}
-          </button>
-        ))}
-      </div>
+      <Textarea
+        value={item.description}
+        onChange={(e) => onChange("description", e.target.value)}
+        placeholder="상세 설명"
+        className="min-h-[80px]"
+      />
+      {members.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {members.map((member) => (
+            <button
+              key={member.userId}
+              type="button"
+              onClick={() => toggleAssignee(member.userId)}
+              className={[
+                "rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-100",
+                item.assigneeUserIds.includes(member.userId)
+                  ? "border-brand-primary/30 bg-brand-warmBg text-brand-primary"
+                  : "border-lava-border bg-lava-raised text-lava-secondary hover:border-lava-borderStrong hover:text-lava-text"
+              ].join(" ")}
+            >
+              {member.name}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function ReadOnlyScheduleItem({ item, members }: { item: ScheduleItemInput; members: ProjectMemberSummary[] }) {
+function ReadOnlyScheduleItem({
+  item,
+  members
+}: {
+  item: ScheduleItemInput;
+  members: ProjectMemberSummary[];
+}) {
   const assigneeNames = item.assigneeUserIds
-    .map((userId) => members.find((member) => member.userId === userId)?.name)
+    .map((id) => members.find((m) => m.userId === id)?.name)
     .filter(Boolean)
     .join(", ");
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-black text-lava-text">{item.title}</h3>
-        <Badge tone={item.type === "meeting" ? "warning" : item.type === "sprint" ? "purple" : "gray"}>
-          {scheduleTypes.find((type) => type.value === item.type)?.label}
+        <h3 className="text-[13.5px] font-semibold text-lava-text">{item.title}</h3>
+        <Badge
+          tone={
+            item.type === "meeting"
+              ? "warning"
+              : item.type === "sprint"
+              ? "purple"
+              : "gray"
+          }
+        >
+          {scheduleTypes.find((t) => t.value === item.type)?.label}
         </Badge>
       </div>
-      <p className="mt-2 text-sm leading-6 text-lava-secondary">{item.description}</p>
-      <p className="mt-3 text-xs text-lava-secondary">
+      <p className="mt-2 text-[12.5px] leading-[1.6] text-lava-secondary">
+        {item.description}
+      </p>
+      <p className="mt-2.5 text-[12px] text-lava-muted">
         {item.startDate} ~ {item.endDate}
         {assigneeNames ? ` · ${assigneeNames}` : ""}
       </p>
@@ -765,21 +997,25 @@ function ReadOnlyScheduleItem({ item, members }: { item: ScheduleItemInput; memb
   );
 }
 
+/* ── Utilities ───────────────────────────────────────── */
+
 function parseCommaList(value: string): string[] {
   return value
     .split(",")
-    .map((item) => item.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
 }
 
-function formatInvitationStatus(status: ProjectSummary["invitations"][number]["status"]): string {
-  const statusMap: Record<ProjectSummary["invitations"][number]["status"], string> = {
+function formatInvitationStatus(
+  status: ProjectSummary["invitations"][number]["status"]
+): string {
+  const map: Record<typeof status, string> = {
     pending: "응답 대기",
     accepted: "수락",
     rejected: "거부",
     expired: "만료"
   };
-  return statusMap[status];
+  return map[status];
 }
 
 function formatDate(value: string): string {

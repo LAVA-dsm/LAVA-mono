@@ -1,20 +1,51 @@
 import type { HTMLAttributes } from "react";
 
-type BadgeTone = "success" | "warning" | "purple" | "red" | "gray";
+type BadgeTone = "success" | "warning" | "purple" | "red" | "gray" | "blue" | "teal";
 
 const tones: Record<BadgeTone, string> = {
-  success: "border-green-100 bg-green-50 text-lava-success",
-  warning: "border-orange-100 bg-orange-50 text-lava-warning",
-  purple: "border-violet-100 bg-violet-50 text-lava-purple",
-  red: "border-red-100 bg-red-50 text-brand-red",
-  gray: "border-lava-border bg-lava-raised text-lava-secondary"
+  success: "border-[rgb(var(--c-success)/0.25)] bg-[rgb(var(--c-success)/0.10)] text-lava-success",
+  warning: "border-[rgb(var(--c-warning)/0.25)] bg-[rgb(var(--c-warning)/0.10)] text-lava-warning",
+  purple:  "border-[rgb(var(--c-purple)/0.25)] bg-[rgb(var(--c-purple)/0.10)] text-lava-purple",
+  red:     "border-[rgb(var(--c-red)/0.25)] bg-[rgb(var(--c-red)/0.10)] text-brand-red",
+  gray:    "border-lava-border bg-lava-raised text-lava-secondary",
+  blue:    "border-[rgb(var(--c-blue)/0.25)] bg-[rgb(var(--c-blue)/0.10)] text-lava-blue",
+  teal:    "border-[rgb(var(--c-teal)/0.25)] bg-[rgb(var(--c-teal)/0.10)] text-lava-teal"
 };
 
-export function Badge({ className = "", tone = "gray", ...props }: HTMLAttributes<HTMLSpanElement> & { tone?: BadgeTone }) {
+const dotColor: Record<BadgeTone, string> = {
+  success: "#15935A",
+  warning: "#B5710A",
+  purple:  "#7B61FF",
+  red:     "#D11A36",
+  gray:    "#9498A1",
+  blue:    "#5865F2",
+  teal:    "#20A99A"
+};
+
+type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
+  tone?: BadgeTone;
+  dot?: boolean;
+};
+
+export function Badge({ className = "", tone = "gray", dot = false, children, ...props }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold leading-none ${tones[tone]} ${className}`}
+      className={[
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-[3px]",
+        "text-[11px] font-semibold leading-none tracking-[0.01em]",
+        tones[tone],
+        className
+      ].join(" ")}
       {...props}
-    />
+    >
+      {dot && (
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{ backgroundColor: dotColor[tone] }}
+          aria-hidden
+        />
+      )}
+      {children}
+    </span>
   );
 }

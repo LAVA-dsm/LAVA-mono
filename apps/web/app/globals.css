@@ -1,180 +1,348 @@
+/* ─────────────────────────────────────────────────────
+   Pretendard Variable — Korean-first system font
+   ───────────────────────────────────────────────────── */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════
+   DESIGN SYSTEM — CSS CUSTOM PROPERTIES
+   Restrained, Linear/Notion-style functional SaaS.
+   ═══════════════════════════════════════════════════ */
 :root {
-  color: #24262b;
-  background: #f6f7f9;
-  --lava-grid: rgba(36, 38, 43, 0.045);
-  --lava-hairline: rgba(36, 38, 43, 0.08);
+  --font: 'Pretendard Variable', 'Pretendard', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* ── Themeable colors as RGB channels (alpha-capable) ── */
+  --c-app:          251 251 252;
+  --c-surface:      255 255 255;
+  --c-raised:       247 248 250;
+  --c-border:       236 237 240;
+  --c-border-strong:225 227 232;
+  --c-text:         28 29 33;
+  --c-secondary:    92 97 107;
+  --c-muted:        148 152 161;
+  --c-warm:         255 241 236;   /* brand warm tint */
+
+  /* Brand + semantic (stable across themes) */
+  --c-brand:        255 90 45;
+  --c-brand-hover:  234 74 33;
+  --c-red:          209 26 54;
+  --c-success:      21 147 90;
+  --c-warning:      181 113 10;
+  --c-purple:       123 97 255;
+  --c-blue:         88 101 242;
+  --c-teal:         32 169 154;
+
+  /* Named convenience vars (derive from channels) */
+  --brand:      rgb(var(--c-brand));
+  --brand-hover:rgb(var(--c-brand-hover));
+  --brand-warm: rgb(var(--c-warm));
+  --bg:         rgb(var(--c-app));
+  --surface:    rgb(var(--c-surface));
+  --surface-2:  rgb(var(--c-raised));
+  --border:     rgb(var(--c-border));
+  --border-2:   rgb(var(--c-border-strong));
+  --text-1:     rgb(var(--c-text));
+  --text-2:     rgb(var(--c-secondary));
+  --text-3:     rgb(var(--c-muted));
+  --color-success: rgb(var(--c-success));
+  --color-warning: rgb(var(--c-warning));
+  --color-danger:  rgb(var(--c-red));
+
+  /* Glass header tint (themeable) */
+  --glass: rgba(255,255,255,0.8);
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgba(20,21,26,0.04);
+  --shadow-sm: 0 1px 2px rgba(20,21,26,0.05);
+  --shadow-md: 0 2px 8px rgba(20,21,26,0.06);
+  --shadow-lg: 0 8px 24px rgba(20,21,26,0.08);
+
+  /* Dark sidebar chrome (constant — dark in both themes) */
+  --side-bg:      #0E0E11;
+  --side-bg-2:    #15161A;
+  --side-border:  rgba(255,255,255,0.07);
+  --side-text:    #E7E8EA;
+  --side-text-2:  #9B9DA4;
+  --side-text-3:  #6B6E76;
+
+  --ease-out:    cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  color-scheme: light;
 }
 
-* {
-  box-sizing: border-box;
+/* ── Dark theme ── */
+[data-theme="dark"] {
+  --c-app:          12 13 16;
+  --c-surface:      24 25 29;
+  --c-raised:       30 32 37;
+  --c-border:       42 44 50;
+  --c-border-strong:55 58 65;
+  --c-text:         237 238 240;
+  --c-secondary:    167 171 179;
+  --c-muted:        120 124 133;
+  --c-warm:         52 30 22;
+
+  --c-success:      59 185 122;
+  --c-warning:      221 158 80;
+  --c-red:          240 90 115;
+  --c-purple:       163 138 255;
+  --c-blue:         126 137 255;
+  --c-teal:         63 182 168;
+
+  --glass: rgba(18,19,23,0.8);
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.35);
+  --shadow-md: 0 2px 10px rgba(0,0,0,0.45);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.55);
+
+  color-scheme: dark;
 }
+
+/* ═══════════════════════════════════════════════════
+   BASE RESET
+   ═══════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; }
 
 html {
   min-width: 320px;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
-  min-height: 100vh;
-  color: #24262b;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(246, 247, 249, 0.94) 280px),
-    repeating-linear-gradient(90deg, transparent 0, transparent 31px, var(--lava-grid) 32px),
-    #f6f7f9;
-  font-feature-settings: "tnum";
-  text-rendering: geometricPrecision;
+  min-height: 100svh;
+  font-family: var(--font);
+  color: var(--text-1);
+  background: var(--bg);
+  font-feature-settings: "tnum", "cv01";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.011em;
 }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
+button, input, textarea, select { font: inherit; letter-spacing: inherit; }
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 
-button,
-a,
-input,
-textarea,
-select {
-  -webkit-tap-highlight-color: transparent;
+/* ═══════════════════════════════════════════════════
+   FOCUS / SELECTION
+   ═══════════════════════════════════════════════════ */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  border-radius: 6px;
 }
+::selection { background: rgba(255,90,45,0.18); color: var(--text-1); }
 
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 2px solid #ff5a2d;
-  outline-offset: 2px;
-}
-
-::selection {
-  background: #ffe0d5;
-  color: #24262b;
-}
-
-::-webkit-scrollbar {
-  height: 10px;
-  width: 10px;
-}
-
+/* ═══════════════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   border-radius: 999px;
-  background: #c5cad3;
+  background: rgb(var(--c-border-strong));
   background-clip: content-box;
 }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-muted)); background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+/* ═══════════════════════════════════════════════════
+   SURFACE PANELS — borders carry the weight, not shadow
+   ═══════════════════════════════════════════════════ */
 .lava-panel {
-  border: 1px solid rgba(230, 232, 238, 0.94);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(251, 252, 253, 0.94)),
-    #ffffff;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 16px 40px rgba(16, 24, 40, 0.06);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
 }
-
 .lava-panel-subtle {
-  border: 1px solid rgba(230, 232, 238, 0.92);
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.035);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.lava-panel-elevated {
+  border: 1px solid var(--border-2);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
 }
 
-.lava-text-balance {
-  text-wrap: balance;
+/* ═══════════════════════════════════════════════════
+   DARK SIDEBAR CHROME
+   ═══════════════════════════════════════════════════ */
+.lava-side {
+  background: var(--side-bg);
+  background-image:
+    radial-gradient(120% 80% at 0% 0%, rgba(255,90,45,0.06) 0%, transparent 42%);
+  border-right: 1px solid var(--side-border);
+}
+.lava-side-item {
+  position: relative;
+  color: var(--side-text-2);
+  transition: color 130ms var(--ease-out), background 130ms var(--ease-out);
+}
+.lava-side-item:hover {
+  color: var(--side-text);
+  background: rgba(255,255,255,0.04);
+}
+.lava-side-item[data-active="true"] {
+  color: #fff;
+  background: rgba(255,255,255,0.06);
+}
+.lava-side-item[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  top: 50%;
+  height: 18px;
+  width: 3px;
+  transform: translateY(-50%);
+  border-radius: 0 3px 3px 0;
+  background: var(--brand);
 }
 
+/* keyboard hint */
+.lava-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 5px;
+  border: 1px solid var(--border-2);
+  background: var(--surface);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-3);
+}
+
+/* ═══════════════════════════════════════════════════
+   AVATAR
+   ═══════════════════════════════════════════════════ */
+.lava-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  background: linear-gradient(140deg, var(--av-1, #FF7A4D) 0%, var(--av-2, #FF5A2D) 100%);
+}
+
+/* ═══════════════════════════════════════════════════
+   CARD INTERACTION
+   ═══════════════════════════════════════════════════ */
+.lava-lift {
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+.lava-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-2);
+}
+
+/* ═══════════════════════════════════════════════════
+   GLASS HEADER
+   ═══════════════════════════════════════════════════ */
+.lava-glass {
+  background: var(--glass);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+}
+
+/* ═══════════════════════════════════════════════════
+   TYPOGRAPHY UTILITIES
+   ═══════════════════════════════════════════════════ */
+.lava-text-balance { text-wrap: balance; }
+
+/* ═══════════════════════════════════════════════════
+   SHIMMER LOADING SKELETON
+   ═══════════════════════════════════════════════════ */
+.lava-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.lava-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.04) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: -150% 0; }
+  100% { background-position:  150% 0; }
+}
+
+/* ═══════════════════════════════════════════════════
+   ANIMATION DELAY UTILITIES + padding overrides
+   ═══════════════════════════════════════════════════ */
+@layer utilities {
+  .delay-75  { animation-delay: 75ms; }
+  .delay-100 { animation-delay: 100ms; }
+  .delay-150 { animation-delay: 150ms; }
+  .delay-200 { animation-delay: 200ms; }
+
+  .pad-7 { padding: 1.75rem !important; }
+  .pad-8 { padding: 2rem !important; }
+}
+
+/* ═══════════════════════════════════════════════════
+   FULLCALENDAR THEME
+   ═══════════════════════════════════════════════════ */
 .lava-calendar .fc {
-  --fc-small-font-size: 12px;
+  --fc-small-font-size: 11px;
   --fc-page-bg-color: transparent;
-  --fc-neutral-bg-color: #fbfcfd;
-  --fc-border-color: #e6e8ee;
-  --fc-today-bg-color: #fff1ec;
-}
-
-.lava-calendar .fc {
-  font-family: inherit;
+  --fc-neutral-bg-color: var(--surface-2);
+  --fc-border-color: var(--border);
+  --fc-today-bg-color: rgb(var(--c-warm));
+  font-family: var(--font);
   font-size: 12px;
 }
-
+.lava-calendar .fc-toolbar { align-items: center; flex-wrap: wrap; gap: 8px; }
 .lava-calendar .fc-toolbar-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #24262b;
+  font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-1);
 }
-
 .lava-calendar .fc-button {
-  min-height: 34px;
-  border: 1px solid #d7dbe4;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #24262b;
+  min-height: 30px; padding: 0 10px;
+  border: 1px solid var(--border-2); border-radius: 8px;
+  background: var(--surface); color: var(--text-2);
   box-shadow: none;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: none;
+  font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0;
+  transition: all 130ms ease;
 }
-
 .lava-calendar .fc-button:hover,
 .lava-calendar .fc-button:focus {
-  border-color: #ff5a2d;
-  background: #fff1ec;
-  color: #ff5a2d;
+  border-color: var(--border-2); background: var(--surface-2); color: var(--text-1); box-shadow: none;
 }
-
 .lava-calendar .fc-button-primary:not(:disabled).fc-button-active,
 .lava-calendar .fc-button-primary:not(:disabled):active {
-  border-color: #ff5a2d;
-  background: #ff5a2d;
-  color: #ffffff;
+  border-color: var(--brand); background: var(--brand); color: #fff; box-shadow: none;
 }
-
 .lava-calendar .fc-theme-standard td,
 .lava-calendar .fc-theme-standard th,
-.lava-calendar .fc-theme-standard .fc-scrollgrid {
-  border-color: #e6e8ee;
-}
-
-.lava-calendar .fc-scrollgrid {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.lava-calendar .fc-col-header-cell {
-  background: #fbfcfd;
-}
-
+.lava-calendar .fc-theme-standard .fc-scrollgrid { border-color: var(--border); }
+.lava-calendar .fc-scrollgrid { border-radius: 10px; overflow: hidden; }
+.lava-calendar .fc-col-header-cell { background: var(--surface-2); }
 .lava-calendar .fc-col-header-cell-cushion {
-  padding: 10px 0;
-  font-size: 11px;
-  font-weight: 800;
+  padding: 8px 4px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3);
 }
-
-.lava-calendar .fc-daygrid-day-number,
-.lava-calendar .fc-col-header-cell-cushion {
-  color: #24262b;
-}
-
 .lava-calendar .fc-daygrid-day-number {
-  padding: 8px;
-  font-size: 11px;
-  font-weight: 700;
+  padding: 6px 8px; font-size: 11px; font-weight: 600; color: var(--text-2);
 }
-
+.lava-calendar .fc-day-today .fc-daygrid-day-number { color: var(--brand); font-weight: 800; }
 .lava-calendar .fc-daygrid-event {
-  border-radius: 6px;
-  padding: 2px 5px;
-  font-size: 11px;
-  font-weight: 700;
+  border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 600; border: none; margin-bottom: 1px;
 }
