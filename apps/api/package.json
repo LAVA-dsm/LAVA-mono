@@ -5,7 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "build": "pnpm --filter @lava/shared build && pnpm prisma:generate && tsc -p tsconfig.build.json",
-    "start:dev": "pnpm --filter @lava/shared build && pnpm prisma:generate && tsx watch src/main.ts",
+    "start:dev": "pnpm --filter @lava/shared build && pnpm prisma:generate && tsx watch --env-file=../../.env src/main.ts",
     "test": "vitest run",
     "typecheck": "pnpm --filter @lava/shared build && pnpm prisma:generate && tsc -p tsconfig.json --noEmit",
     "lint": "pnpm --filter @lava/shared build && pnpm prisma:generate && tsc -p tsconfig.json --noEmit",
