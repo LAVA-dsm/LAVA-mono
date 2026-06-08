@@ -54,6 +54,15 @@ async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> 
   }
 
   if (!response.ok) {
+    if (response.status === 404) {
+      if (path === "/projects") {
+        return { projects: [] } as unknown as T;
+      }
+      if (path === "/projects/calendar-items") {
+        return { items: [] } as unknown as T;
+      }
+    }
+
     let message = response.status === 401 ? "로그인이 필요합니다." : "서버 일시 오류가 발생했습니다.";
     
     // 500번대 인프라 에러 (Bad Gateway, Timeout 등) 필터링
