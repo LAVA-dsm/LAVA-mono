@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards, Headers } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiParam } from "@nestjs/swagger";
 import {
   aiDocumentEditInputSchema,
@@ -50,9 +50,10 @@ export class ProjectsController {
   @ApiResponse({ status: 400, description: "입력값 검증 실패" })
   createProject(
     @CurrentUserParam() user: CurrentUser,
-    @Body(new ZodValidationPipe(projectCreateInputSchema)) body: ProjectCreateInput
+    @Body(new ZodValidationPipe(projectCreateInputSchema)) body: ProjectCreateInput,
+    @Headers("origin") origin?: string
   ) {
-    return this.projectsService.createProject(body, user);
+    return this.projectsService.createProject(body, user, origin);
   }
 
   @Get()

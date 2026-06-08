@@ -57,7 +57,7 @@ export class ProjectsService {
     private readonly emailService: EmailService
   ) {}
 
-  async createProject(input: ProjectCreateInput, user: CurrentUser): Promise<ProjectSummary> {
+  async createProject(input: ProjectCreateInput, user: CurrentUser, originHeaders?: string): Promise<ProjectSummary> {
     const inviteEmails = input.type === "team" ? input.inviteEmails : [];
     const invitationDrafts = inviteEmails.map((email) => this.createInvitationDraft(email));
     const persistedInput = { ...input, inviteEmails };
@@ -143,7 +143,7 @@ export class ProjectsService {
           .sendInvitation({
             email: draft.email,
             projectName: project.name,
-            invitationUrl: this.buildInvitationUrl(draft.token)
+            invitationUrl: this.buildInvitationUrl(draft.token, originHeaders)
           })
           .catch((error: unknown) => {
             this.logger.warn(
@@ -1033,9 +1033,10 @@ export class ProjectsService {
     return createHash("sha256").update(token).digest("hex");
   }
 
-  private buildInvitationUrl(token: string): string {
+  private buildInvitationUrl(token: string, requestOrigin?: string): string {
     const origin =
       process.env.FRONTEND_PUBLIC_URL?.trim() ||
+      requestOrigin?.trim() ||
       process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() ||
       "http://localhost:3000";
     return `${origin}/invitations/${token}`;
