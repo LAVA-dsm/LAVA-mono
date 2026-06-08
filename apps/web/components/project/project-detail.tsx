@@ -842,8 +842,7 @@ function ScheduleSection({
 
         {isLeader && schedule && (
           <div className="mt-6 rounded-xl border border-lava-border bg-lava-raised p-4">
-            <p className="mb-3 text-[13px] font-semibold text-lava-text">AI 일정 수정 요청</p>
-            <FieldWrapper label="" hint="예: 회의 일정을 주말 대신 평일 저녁으로 조정해줘.">
+            <FieldWrapper label="AI 일정 수정 요청" hint="예: 회의 일정을 주말 대신 평일 저녁으로 조정해줘.">
               <Textarea
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}

@@ -50,11 +50,42 @@ describe("projectCreateInputSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects ideas shorter than 200 characters including spaces", () => {
+  it("rejects ideas shorter than 200 characters including spaces when AI enhancement is not used", () => {
     const result = projectCreateInputSchema.safeParse({
       name: "LAVA",
       type: "personal",
       originalIdea: "짧은 아이디어",
+      ideaEnhancementUsed: false,
+      startDate: "2026-06-01",
+      endDate: "2026-06-30",
+      inviteEmails: []
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts ideas shorter than 200 characters including spaces when AI enhancement is used", () => {
+    const result = projectCreateInputSchema.safeParse({
+      name: "LAVA",
+      type: "personal",
+      originalIdea: "짧은 아이디어",
+      ideaEnhancementUsed: true,
+      enhancedIdea: "AI로 증강된 충분히 긴 아이디어 텍스트...",
+      startDate: "2026-06-01",
+      endDate: "2026-06-30",
+      inviteEmails: []
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty original idea even when AI enhancement is used", () => {
+    const result = projectCreateInputSchema.safeParse({
+      name: "LAVA",
+      type: "personal",
+      originalIdea: "",
+      ideaEnhancementUsed: true,
+      enhancedIdea: "AI로 증강된 충분히 긴 아이디어 텍스트...",
       startDate: "2026-06-01",
       endDate: "2026-06-30",
       inviteEmails: []

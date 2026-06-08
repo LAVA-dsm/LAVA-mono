@@ -44,7 +44,7 @@ describe("SettingsPage", () => {
     await user.type(screen.getByLabelText(/인증 코드/), "123456");
     await user.click(screen.getByRole("button", { name: "인증 확인" }));
     await user.type(screen.getByPlaceholderText("새 비밀번호"), "Passw0rd!");
-    await user.type(screen.getByPlaceholderText("새 비밀번호 확인"), "Passw0rd!");
+    await user.type(screen.getByPlaceholderText("새 비밀번호 재입력"), "Passw0rd!");
     await user.click(screen.getByRole("button", { name: "비밀번호 변경" }));
 
     await waitFor(() => expect(screen.getByText("비밀번호를 변경했습니다.")).toBeInTheDocument());

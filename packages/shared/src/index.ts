@@ -197,14 +197,23 @@ export const projectCreateInputSchema = z
     type: projectTypeSchema,
     originalIdea: z
       .string()
-      .min(PROJECT_IDEA_MIN_LENGTH, "아이디어는 공백 포함 200자 이상이어야 합니다."),
+      .min(1, "아이디어를 입력해 주세요."),
     enhancedIdea: z.string().optional(),
     ideaEnhancementUsed: z.boolean().default(false),
     startDate: dateOnlySchema,
     endDate: dateOnlySchema,
     inviteEmails: z.array(inviteEmailSchema).default([])
   })
-  .superRefine((value, ctx) => validateDateRange(value, ctx, { maxDays: PROJECT_MAX_DURATION_DAYS }))
+  .superRefine((value, ctx) => {
+    validateDateRange(value, ctx, { maxDays: PROJECT_MAX_DURATION_DAYS });
+    if (!value.ideaEnhancementUsed && value.originalIdea.length < PROJECT_IDEA_MIN_LENGTH) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["originalIdea"],
+        message: `아이디어는 공백 포함 ${PROJECT_IDEA_MIN_LENGTH}자 이상이어야 합니다.`
+      });
+    }
+  })
   .transform((value) => ({
     ...value,
     inviteEmails: Array.from(new Set(value.inviteEmails))

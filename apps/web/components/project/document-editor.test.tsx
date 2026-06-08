@@ -184,7 +184,7 @@ describe("DocumentEditor", () => {
     const body = await screen.findByLabelText(/문서 본문/);
     const nextContent = "# 직접 수정한 기능 명세서";
     fireEvent.change(body, { target: { value: nextContent } });
-    await waitFor(() => expect(screen.getByText(`${nextContent.length}/2000`)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(`${nextContent.length} / 2000`)).toBeInTheDocument());
     fireEvent.click(await screen.findByRole("button", { name: /저장/ }));
 
     await waitFor(() =>
@@ -200,7 +200,7 @@ describe("DocumentEditor", () => {
 
     const body = await screen.findByLabelText(/문서 본문/);
     fireEvent.change(body, { target: { value: "가".repeat(2001) } });
-    await waitFor(() => expect(screen.getByText("2001/2000")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("2001 / 2000")).toBeInTheDocument());
 
     await waitFor(async () => expect(await screen.findByRole("button", { name: /저장/ })).toBeDisabled());
     expect(screen.getByText("기능 명세서는 2000자 이하로 저장해야 합니다.")).toBeInTheDocument();
@@ -227,7 +227,7 @@ describe("DocumentEditor", () => {
 
     const titleInput = await screen.findByDisplayValue("기능 구현");
     fireEvent.change(titleInput, { target: { value: "수정된 일정" } });
-    await user.click(screen.getByRole("button", { name: "일정 저장" }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
 
     await waitFor(() =>
       expect(mockedApiClient.updateSchedule).toHaveBeenCalledWith("project-1", {

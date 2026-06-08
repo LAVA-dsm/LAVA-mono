@@ -1044,8 +1044,8 @@ export class ProjectsService {
   private buildInvitationUrl(token: string, requestOrigin?: string): string {
     const origin =
       process.env.FRONTEND_PUBLIC_URL?.trim() ||
-      requestOrigin?.trim() ||
       process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() ||
+      requestOrigin?.trim() ||
       "http://localhost:3000";
     return `${origin}/invitations/${token}`;
   }

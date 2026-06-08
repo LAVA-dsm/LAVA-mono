@@ -62,7 +62,7 @@ describe("ProjectWizard", () => {
 
     await user.click(screen.getByRole("button", { name: "AI 아이디어 증강" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "AI 아이디어 증강 완료" })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "AI 증강 완료" })).toBeDisabled());
     expect(screen.getByLabelText(/프로젝트 아이디어/)).toHaveValue("AI가 구체화한 프로젝트 개요입니다.");
   });
 

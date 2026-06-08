@@ -463,6 +463,36 @@ export function ProjectWizard() {
           </Button>
         )}
       </div>
+
+      {isCreating && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/75 backdrop-blur-md transition-opacity duration-300">
+          <div className="max-w-md p-8 text-center space-y-6">
+            <div className="relative flex justify-center">
+              <Loader2 className="h-16 w-16 text-brand-primary animate-spin" />
+              <Sparkles className="absolute h-6 w-6 text-brand-primary animate-pulse top-5" />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold tracking-tight text-white">
+                AI 프로젝트 문서 구성 중
+              </h3>
+              <p className="text-sm text-lava-muted leading-relaxed">
+                아이디어를 분석하여 최적의 기능 명세서와<br />
+                API 명세서 초안을 자동으로 작성하고 있습니다.<br />
+                이 작업은 최대 1분 정도 소요될 수 있습니다.
+              </p>
+            </div>
+            
+            <div className="flex justify-center gap-2 text-xs text-brand-primary/80 font-semibold animate-pulse">
+              <span>기능 분석 중</span>
+              <span>•</span>
+              <span>명세서 생성 중</span>
+              <span>•</span>
+              <span>스프린트 설계 중</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

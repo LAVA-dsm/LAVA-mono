@@ -133,11 +133,13 @@ export class AiService {
   async generateSchedule(input: AiScheduleGenerateInput): Promise<ScheduleItemInput[]> {
     const prompt = [
       "아래 프로젝트와 멤버 정보를 바탕으로 프로젝트 일정을 생성하세요.",
-      "응답은 설명 없이 JSON 객체만 반환하세요.",
+      "응답은 다른 설명이나 텍스트 없이 오직 유효한 JSON 객체만 반환하세요.",
       "JSON 형식: {\"items\":[{\"title\":\"...\",\"type\":\"task|sprint|meeting\",\"description\":\"...\",\"assigneeUserIds\":[\"user-id\"],\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}]}",
-      "모든 일정은 날짜 단위이며 프로젝트 시작일과 종료일 사이여야 합니다.",
-      "개별 작업, 스프린트, 회의를 균형 있게 포함하세요.",
-      "회의 시간은 멤버들의 가용 시간을 최대한 반영하고, 불분명하면 리더가 가능한 시간으로 배정하세요.",
+      "중요 제약 조건:",
+      "1. 모든 일정의 startDate와 endDate는 반드시 YYYY-MM-DD 형식이어야 하고, 프로젝트의 시작일과 종료일 기간 내에 속해야 합니다.",
+      "2. assigneeUserIds 배열에는 반드시 제공된 멤버 목록에 있는 실제 userId 값들만 할당해야 합니다. 임의의 가상 ID나 이름을 할당해서는 절대 안 됩니다. 담당자가 불명확한 경우 빈 배열([])로 설정하세요.",
+      "3. 개별 작업, 스프린트, 회의를 균형 있게 포함하세요.",
+      "4. 회의 시간은 멤버들의 가용 시간을 최대한 반영하고, 불분명하면 리더가 가능한 시간으로 배정하세요.",
       `프로젝트:\n${JSON.stringify(input.project, null, 2)}`,
       `멤버:\n${JSON.stringify(input.members, null, 2)}`,
       `기능 명세서:\n${input.featureSpec}`
@@ -149,9 +151,11 @@ export class AiService {
   async editSchedule(input: AiScheduleEditInput): Promise<ScheduleItemInput[]> {
     const prompt = [
       "아래 기존 프로젝트 일정을 사용자의 요청에 맞게 수정하세요.",
-      "응답은 설명 없이 JSON 객체만 반환하세요.",
+      "응답은 다른 설명이나 텍스트 없이 오직 유효한 JSON 객체만 반환하세요.",
       "JSON 형식: {\"items\":[{\"title\":\"...\",\"type\":\"task|sprint|meeting\",\"description\":\"...\",\"assigneeUserIds\":[\"user-id\"],\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}]}",
-      "모든 일정은 날짜 단위이며 프로젝트 시작일과 종료일 사이여야 합니다.",
+      "중요 제약 조건:",
+      "1. 모든 일정의 startDate와 endDate는 반드시 YYYY-MM-DD 형식이어야 하고, 프로젝트의 시작일과 종료일 기간 내에 속해야 합니다.",
+      "2. assigneeUserIds 배열에는 반드시 제공된 멤버 목록에 있는 실제 userId 값들만 할당해야 합니다. 임의의 가상 ID나 이름을 할당해서는 절대 안 됩니다. 담당자가 불명확한 경우 빈 배열([])로 설정하세요.",
       `사용자 요청:\n${input.prompt}`,
       `프로젝트:\n${JSON.stringify(input.project, null, 2)}`,
       `멤버:\n${JSON.stringify(input.members, null, 2)}`,
@@ -232,8 +236,11 @@ export class AiService {
 
   private extractJson(text: string): string {
     const trimmed = text.trim();
-    const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
-    return fenced?.[1]?.trim() || trimmed;
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenced?.[1]) {
+      return fenced[1].trim();
+    }
+    return trimmed;
   }
 
   private async generateText(prompt: string): Promise<string> {
