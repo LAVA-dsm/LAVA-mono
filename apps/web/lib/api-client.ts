@@ -29,12 +29,17 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4
 async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response;
 
+  const defaultHeaders: Record<string, string> = {};
+  if (init.body) {
+    defaultHeaders["content-type"] = "application/json";
+  }
+
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       credentials: "include",
       headers: {
-        "content-type": "application/json",
+        ...defaultHeaders,
         ...init.headers
       }
     });
