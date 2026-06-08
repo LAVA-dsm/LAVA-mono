@@ -65,7 +65,18 @@ async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> 
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const body = await response.json();
-        message = body.issues?.[0]?.message || body.message || body.error || message;
+        const rawMessage = body.issues?.[0]?.message || body.message || body.error || message;
+        if (
+          typeof rawMessage === "string" &&
+          (rawMessage.includes("Cannot GET") ||
+            rawMessage.includes("Cannot POST") ||
+            rawMessage.includes("Cannot PUT") ||
+            rawMessage.includes("Cannot DELETE"))
+        ) {
+          message = "요청한 서비스를 찾을 수 없거나 서버 설정 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+        } else {
+          message = rawMessage;
+        }
       } else {
         const text = await response.text();
         // 리버스 프록시나 Express에서 던지는 생 텍스트 라우팅 에러 감지 및 정제

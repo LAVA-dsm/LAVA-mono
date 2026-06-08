@@ -599,9 +599,17 @@ export class ProjectsService {
     try {
       return await this.aiService.generateInitialDocuments(input);
     } catch (error) {
-      this.logger.warn(
-        `Initial document generation failed: ${error instanceof Error ? error.message : "unknown"}`
-      );
+      const isApiKeyMissing = error instanceof Error && error.message.includes("OPENAI_API_KEY");
+      if (isApiKeyMissing) {
+        this.logger.warn(
+          "⚠️ [AI 서비스 장애] OPENAI_API_KEY 환경변수가 설정되지 않았거나 유효하지 않습니다. " +
+            "기능 및 API 명세서 초안은 AI 자동 생성 대신 기본 템플릿(Fallback)으로 대체되어 저장됩니다."
+        );
+      } else {
+        this.logger.warn(
+          `Initial document generation failed: ${error instanceof Error ? error.message : "unknown"}`
+        );
+      }
       return {
         featureSpec: FALLBACK_DOCUMENT_CONTENT,
         apiSpec: FALLBACK_DOCUMENT_CONTENT,
