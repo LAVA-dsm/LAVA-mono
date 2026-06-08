@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Bell,
   ChevronsUpDown,
   FolderPlus,
   LayoutDashboard,
@@ -258,15 +257,6 @@ export function AppShell({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            aria-label="알림"
-            className="relative flex h-8 w-8 items-center justify-center rounded-lg text-lava-muted transition-colors hover:bg-lava-raised hover:text-lava-secondary"
-          >
-            <Bell className="h-[15px] w-[15px]" aria-hidden />
-            <span className="absolute right-[7px] top-[7px] h-[5px] w-[5px] rounded-full bg-brand-red ring-2 ring-lava-surface" />
-          </button>
-
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
