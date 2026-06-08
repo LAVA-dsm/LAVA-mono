@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
   ServiceUnavailableException
 } from "@nestjs/common";
+import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
 import {
   FALLBACK_DOCUMENT_CONTENT,
@@ -501,8 +503,9 @@ export class ProjectsService {
         members: members.map((member) => this.toAiMemberContext(member)),
         featureSpec
       });
-      this.validateScheduleItems(project, items);
-      const schedule = await this.replaceSchedule(project.id, "ai", items);
+      const sanitized = this.sanitizeScheduleItems(project, items);
+      this.validateScheduleItems(project, sanitized);
+      const schedule = await this.replaceSchedule(project.id, "ai", sanitized);
 
       await this.prisma.aiRequestHistory.create({
         data: {
@@ -528,7 +531,18 @@ export class ProjectsService {
         }
       });
 
-      throw new ServiceUnavailableException("AI 일정 생성에 실패했어요.");
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      if (error instanceof z.ZodError) {
+        throw new BadRequestException(`AI가 생성한 일정 데이터 형식이 올바르지 않습니다: ${error.issues[0]?.message} (${error.issues[0]?.path.join(".")})`);
+      }
+      if (error instanceof SyntaxError) {
+        throw new BadRequestException("AI가 올바른 JSON 형식의 일정을 생성하지 못했습니다. 다시 시도해 주세요.");
+      }
+      throw new ServiceUnavailableException(
+        error instanceof Error ? `AI 일정 생성에 실패했습니다: ${error.message}` : "AI 일정 생성에 실패했어요."
+      );
     }
   }
 
@@ -562,8 +576,9 @@ export class ProjectsService {
         currentSchedule,
         prompt
       });
-      this.validateScheduleItems(project, items);
-      const schedule = await this.replaceSchedule(project.id, "ai", items);
+      const sanitized = this.sanitizeScheduleItems(project, items);
+      this.validateScheduleItems(project, sanitized);
+      const schedule = await this.replaceSchedule(project.id, "ai", sanitized);
 
       await this.prisma.aiRequestHistory.create({
         data: {
@@ -589,7 +604,18 @@ export class ProjectsService {
         }
       });
 
-      throw new ServiceUnavailableException("AI 일정 수정에 실패했어요.");
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      if (error instanceof z.ZodError) {
+        throw new BadRequestException(`AI가 수정 대행한 일정 데이터 형식이 올바르지 않습니다: ${error.issues[0]?.message} (${error.issues[0]?.path.join(".")})`);
+      }
+      if (error instanceof SyntaxError) {
+        throw new BadRequestException("AI가 올바른 JSON 형식의 일정을 편집하지 못했습니다. 다시 시도해 주세요.");
+      }
+      throw new ServiceUnavailableException(
+        error instanceof Error ? `AI 일정 수정에 실패했습니다: ${error.message}` : "AI 일정 수정에 실패했어요."
+      );
     }
   }
 
@@ -667,6 +693,33 @@ export class ProjectsService {
     }
 
     return this.toScheduleSummary(schedule);
+  }
+
+  private sanitizeScheduleItems(project: ProjectForSummary, items: ScheduleItemInput[]): ScheduleItemInput[] {
+    const acceptedUserIds = new Set(
+      project.members.filter((member) => member.status === "accepted").map((member) => member.userId)
+    );
+
+    return items.map((item) => {
+      let type = (item.type || "task").toLowerCase();
+      if (type !== "task" && type !== "sprint" && type !== "meeting") {
+        type = "task";
+      }
+
+      const startDate = (item.startDate || "").slice(0, 10);
+      const endDate = (item.endDate || "").slice(0, 10);
+
+      const assigneeUserIds = (item.assigneeUserIds || [])
+        .filter((userId) => typeof userId === "string" && acceptedUserIds.has(userId));
+
+      return {
+        ...item,
+        type: type as "task" | "sprint" | "meeting",
+        startDate,
+        endDate,
+        assigneeUserIds
+      };
+    });
   }
 
   private validateScheduleItems(project: ProjectForSummary, items: ScheduleItemInput[]) {
