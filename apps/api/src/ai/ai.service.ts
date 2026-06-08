@@ -69,7 +69,7 @@ export type AiApiSpecEditInput = {
 @Injectable()
 export class AiService {
   private readonly model = process.env.OPENAI_MODEL || "gpt-5-mini";
-  private readonly timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS || 15_000);
+  private readonly timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS || 60_000);
 
   private get client(): OpenAI {
     const baseURL = process.env.OPENAI_BASE_URL?.trim();
