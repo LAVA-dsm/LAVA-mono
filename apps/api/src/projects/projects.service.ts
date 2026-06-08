@@ -1095,11 +1095,16 @@ export class ProjectsService {
   }
 
   private buildInvitationUrl(token: string, requestOrigin?: string): string {
-    const origin =
+    let origin =
       requestOrigin?.trim() ||
       process.env.FRONTEND_PUBLIC_URL?.trim() ||
       process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() ||
       "http://localhost:3000";
+
+    if (origin.endsWith("/")) {
+      origin = origin.slice(0, -1);
+    }
+
     return `${origin}/invitations/${token}`;
   }
 
