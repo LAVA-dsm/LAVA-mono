@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import OpenAI from "openai";
 import {
   FALLBACK_DOCUMENT_CONTENT,
@@ -66,10 +66,19 @@ export type AiApiSpecEditInput = {
   prompt: string;
 };
 
+type AiCallContext = { op: string; userId?: string };
+
 @Injectable()
 export class AiService {
+  private readonly logger = new Logger(AiService.name);
   private readonly model = process.env.OPENAI_MODEL || "gpt-5-mini";
   private readonly timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS || 60_000);
+  // gpt-5 계열 reasoning 모델은 기본 effort가 높아 느리고, reasoning 토큰이
+  // 출력 예산을 다 소모하면 output_text가 비어 503을 유발한다.
+  // effort를 낮추고 출력 토큰 한도를 넉넉히 확보해 양쪽 문제를 함께 막는다.
+  private readonly reasoningEffort = (process.env.OPENAI_REASONING_EFFORT || "minimal").trim();
+  private readonly maxOutputTokens = Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 8000);
+  private readonly maxRetries = Number(process.env.OPENAI_MAX_RETRIES || 2);
 
   private get client(): OpenAI {
     const baseURL = process.env.OPENAI_BASE_URL?.trim();
@@ -77,9 +86,15 @@ export class AiService {
     return new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       ...(baseURL ? { baseURL } : {}),
-      maxRetries: 0,
+      maxRetries: this.maxRetries,
       timeout: this.timeoutMs
     });
+  }
+
+  /** gpt-5 / o 시리즈 등 reasoning 파라미터를 지원하는 모델인지 판별 */
+  private supportsReasoning(): boolean {
+    const m = this.model.toLowerCase();
+    return m.startsWith("gpt-5") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4");
   }
 
   async enhanceIdea(input: IdeaEnhanceInput, requestedByUserId: string): Promise<string> {
@@ -101,18 +116,18 @@ export class AiService {
       `원본 아이디어:\n${input.originalIdea}`
     ].join("\n\n");
 
-    const text = await this.generateText(prompt);
+    const text = await this.generateText(prompt, { op: "enhanceIdea", userId: requestedByUserId });
     return text;
   }
-  async generateInitialDocuments(input: ProjectCreateInput): Promise<GeneratedDocuments> {
+  async generateInitialDocuments(input: ProjectCreateInput, userId?: string): Promise<GeneratedDocuments> {
     let featureSpec = FALLBACK_DOCUMENT_CONTENT;
     let apiSpec = FALLBACK_DOCUMENT_CONTENT;
     let featureSpecFailed = false;
     let apiSpecFailed = false;
 
     const [featureSpecResult, apiSpecResult] = await Promise.allSettled([
-      this.generateFeatureSpec(input),
-      this.generateApiSpec(input)
+      this.generateFeatureSpec(input, userId),
+      this.generateApiSpec(input, undefined, userId)
     ]);
 
     if (featureSpecResult.status === "fulfilled") {
@@ -135,7 +150,7 @@ export class AiService {
     };
   }
 
-  async generateSchedule(input: AiScheduleGenerateInput): Promise<ScheduleItemInput[]> {
+  async generateSchedule(input: AiScheduleGenerateInput, userId?: string): Promise<ScheduleItemInput[]> {
     const prompt = [
       "아래 프로젝트와 멤버 정보를 바탕으로 프로젝트 일정을 생성하세요.",
       "응답은 다른 설명이나 텍스트 없이 오직 유효한 JSON 객체만 반환하세요.",
@@ -150,10 +165,10 @@ export class AiService {
       `기능 명세서:\n${input.featureSpec}`
     ].join("\n\n");
 
-    return this.generateScheduleItems(prompt);
+    return this.generateScheduleItems(prompt, { op: "scheduleGenerate", userId });
   }
 
-  async editSchedule(input: AiScheduleEditInput): Promise<ScheduleItemInput[]> {
+  async editSchedule(input: AiScheduleEditInput, userId?: string): Promise<ScheduleItemInput[]> {
     const prompt = [
       "아래 기존 프로젝트 일정을 사용자의 요청에 맞게 수정하세요.",
       "응답은 다른 설명이나 텍스트 없이 오직 유효한 JSON 객체만 반환하세요.",
@@ -167,10 +182,10 @@ export class AiService {
       `현재 일정:\n${JSON.stringify(input.currentSchedule.items, null, 2)}`
     ].join("\n\n");
 
-    return this.generateScheduleItems(prompt);
+    return this.generateScheduleItems(prompt, { op: "scheduleEdit", userId });
   }
 
-  async editFeatureSpec(input: AiFeatureSpecEditInput): Promise<string> {
+  async editFeatureSpec(input: AiFeatureSpecEditInput, userId?: string): Promise<string> {
     const prompt = [
       "아래 기능 명세서를 사용자의 요청에 맞게 수정하세요.",
       "응답은 설명 없이 수정된 Markdown 본문만 반환하세요.",
@@ -181,10 +196,10 @@ export class AiService {
       `현재 기능 명세서:\n${input.currentFeatureSpec}`
     ].join("\n\n");
 
-    return this.generateText(prompt);
+    return this.generateText(prompt, { op: "editFeatureSpec", userId });
   }
 
-  async editApiSpec(input: AiApiSpecEditInput): Promise<string> {
+  async editApiSpec(input: AiApiSpecEditInput, userId?: string): Promise<string> {
     const prompt = [
       "아래 API 명세서를 사용자의 요청에 맞게 수정하세요.",
       "응답은 설명 없이 수정된 Markdown 본문만 반환하세요.",
@@ -195,10 +210,10 @@ export class AiService {
       `기능 명세서:\n${input.featureSpec || "없음"}`
     ].join("\n\n");
 
-    return this.generateText(prompt);
+    return this.generateText(prompt, { op: "editApiSpec", userId });
   }
 
-  private async generateFeatureSpec(input: ProjectCreateInput): Promise<string> {
+  private async generateFeatureSpec(input: ProjectCreateInput, userId?: string): Promise<string> {
     const idea = input.enhancedIdea || input.originalIdea;
     const prompt = [
       "아래 프로젝트 정보를 바탕으로 기능 명세서를 Markdown으로 작성하세요.",
@@ -211,10 +226,10 @@ export class AiService {
       `아이디어:\n${idea}`
     ].join("\n\n");
 
-    return this.generateText(prompt);
+    return this.generateText(prompt, { op: "featureSpec", userId });
   }
 
-  private async generateApiSpec(input: ProjectCreateInput, featureSpec?: string): Promise<string> {
+  private async generateApiSpec(input: ProjectCreateInput, featureSpec?: string, userId?: string): Promise<string> {
     const idea = input.enhancedIdea || input.originalIdea;
     const prompt = [
       "아래 프로젝트를 위한 API 명세서를 Markdown으로 작성하세요.",
@@ -229,14 +244,25 @@ export class AiService {
       featureSpec ? `기능 명세서:\n${featureSpec}` : ""
     ].filter(Boolean).join("\n\n");
 
-    return this.generateText(prompt);
+    return this.generateText(prompt, { op: "apiSpec", userId });
   }
 
-  private async generateScheduleItems(prompt: string): Promise<ScheduleItemInput[]> {
-    const text = await this.generateText(prompt);
+  private async generateScheduleItems(prompt: string, ctx: AiCallContext): Promise<ScheduleItemInput[]> {
+    const text = await this.generateText(prompt, ctx);
     const jsonText = this.extractJson(text);
-    const parsed = scheduleUpdateInputSchema.parse(JSON.parse(jsonText));
-    return parsed.items;
+    try {
+      const parsed = scheduleUpdateInputSchema.parse(JSON.parse(jsonText));
+      return parsed.items;
+    } catch (error) {
+      this.logger.error(
+        `[AI:${ctx.op}] JSON 파싱/검증 실패 user=${ctx.userId ?? "-"} ` +
+          `name=${error instanceof Error ? error.name : "Unknown"} ` +
+          `message=${error instanceof Error ? error.message : "unknown"} ` +
+          `rawTextChars=${text.length} extractedChars=${jsonText.length} ` +
+          `extractedPreview=${JSON.stringify(jsonText.slice(0, 300))}`
+      );
+      throw error;
+    }
   }
 
   private extractJson(text: string): string {
@@ -252,19 +278,81 @@ export class AiService {
     return target;
   }
 
-  private async generateText(prompt: string): Promise<string> {
+  private async generateText(
+    prompt: string,
+    ctx: AiCallContext = { op: "unknown" }
+  ): Promise<string> {
+    const user = ctx.userId ?? "-";
+
     if (!process.env.OPENAI_API_KEY) {
+      this.logger.error(`[AI:${ctx.op}] OPENAI_API_KEY 미설정 user=${user}`);
       throw new Error("OPENAI_API_KEY is not configured.");
     }
 
-    const response = await this.client.responses.create({
+    const useReasoning = this.supportsReasoning();
+    const request: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
       model: this.model,
-      input: prompt
-    });
+      input: prompt,
+      max_output_tokens: this.maxOutputTokens,
+      ...(useReasoning
+        ? { reasoning: { effort: this.reasoningEffort as "minimal" | "low" | "medium" | "high" } }
+        : {})
+    };
 
+    const startedAt = Date.now();
+    this.logger.log(
+      `[AI:${ctx.op}] 요청 시작 user=${user} model=${this.model} promptChars=${prompt.length} ` +
+        `timeoutMs=${this.timeoutMs} maxRetries=${this.maxRetries} maxOutputTokens=${this.maxOutputTokens} ` +
+        `reasoningEffort=${useReasoning ? this.reasoningEffort : "-"}`
+    );
+
+    let response: OpenAI.Responses.Response;
+    try {
+      response = await this.client.responses.create(request);
+    } catch (error) {
+      const durationMs = Date.now() - startedAt;
+      const err = error as { status?: number; code?: string; type?: string };
+      this.logger.error(
+        `[AI:${ctx.op}] OpenAI 호출 실패 user=${user} durationMs=${durationMs} ` +
+          `name=${error instanceof Error ? error.name : "Unknown"} ` +
+          `status=${err?.status ?? "-"} code=${err?.code ?? "-"} type=${err?.type ?? "-"} ` +
+          `message=${error instanceof Error ? error.message : "unknown"}`,
+        error instanceof Error ? error.stack : undefined
+      );
+      throw error;
+    }
+
+    const durationMs = Date.now() - startedAt;
+    const usage = response.usage as
+      | {
+          input_tokens?: number;
+          output_tokens?: number;
+          total_tokens?: number;
+          output_tokens_details?: { reasoning_tokens?: number };
+        }
+      | undefined;
+    const reasoningTokens = usage?.output_tokens_details?.reasoning_tokens;
+    const outputTypes = Array.isArray(response.output)
+      ? response.output.map((item) => item.type).join(",")
+      : "-";
+    const incompleteReason = (response as { incomplete_details?: { reason?: string } })
+      .incomplete_details?.reason;
     const text = response.output_text?.trim();
 
+    this.logger.log(
+      `[AI:${ctx.op}] 응답 수신 user=${user} durationMs=${durationMs} status=${response.status ?? "-"} ` +
+        `inputTokens=${usage?.input_tokens ?? "-"} outputTokens=${usage?.output_tokens ?? "-"} ` +
+        `reasoningTokens=${reasoningTokens ?? "-"} outputItems=[${outputTypes}] ` +
+        `outputTextChars=${text?.length ?? 0}`
+    );
+
     if (!text) {
+      this.logger.error(
+        `[AI:${ctx.op}] 빈 output_text (503 유발) user=${user} durationMs=${durationMs} ` +
+          `status=${response.status ?? "-"} incompleteReason=${incompleteReason ?? "-"} ` +
+          `reasoningTokens=${reasoningTokens ?? "-"} outputTokens=${usage?.output_tokens ?? "-"} ` +
+          `outputItems=[${outputTypes}]`
+      );
       throw new Error("OpenAI response did not contain text.");
     }
 

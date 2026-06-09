@@ -102,7 +102,7 @@ export class ProjectsService {
       return createdProject;
     });
 
-    const documents = await this.generateDocumentsWithFallback(persistedInput);
+    const documents = await this.generateDocumentsWithFallback(persistedInput, user.id);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.projectDocument.createMany({
@@ -338,13 +338,13 @@ export class ProjectsService {
               project: this.toAiProjectContext(project),
               currentFeatureSpec: document.content,
               prompt
-            })
+            }, user.id)
           : await this.aiService.editApiSpec({
               project: this.toAiProjectContext(project),
               currentApiSpec: document.content,
               featureSpec: project.documents.find((item) => item.type === "feature_spec")?.content,
               prompt
-            });
+            }, user.id);
 
       this.validateDocumentContent(type, content);
 
@@ -507,7 +507,7 @@ export class ProjectsService {
         project: this.toAiProjectContext(project),
         members: members.map((member) => this.toAiMemberContext(member)),
         featureSpec
-      });
+      }, user.id);
       const sanitized = this.sanitizeScheduleItems(project, items);
       this.validateScheduleItems(project, sanitized);
       const schedule = await this.replaceSchedule(project.id, "ai", sanitized);
@@ -577,7 +577,7 @@ export class ProjectsService {
         members: members.map((member) => this.toAiMemberContext(member)),
         currentSchedule,
         prompt
-      });
+      }, user.id);
       const sanitized = this.sanitizeScheduleItems(project, items);
       this.validateScheduleItems(project, sanitized);
       const schedule = await this.replaceSchedule(project.id, "ai", sanitized);
@@ -622,10 +622,11 @@ export class ProjectsService {
   }
 
   private async generateDocumentsWithFallback(
-    input: ProjectCreateInput
+    input: ProjectCreateInput,
+    userId?: string
   ): Promise<GeneratedDocuments> {
     try {
-      return await this.aiService.generateInitialDocuments(input);
+      return await this.aiService.generateInitialDocuments(input, userId);
     } catch (error) {
       const isApiKeyMissing = error instanceof Error && error.message.includes("OPENAI_API_KEY");
       if (isApiKeyMissing) {
