@@ -525,29 +525,26 @@ export class ProjectsService {
 
       return schedule;
     } catch (error) {
+      this.logger.error(
+        `AI schedule generation failed, loading fallback schedule: ${error instanceof Error ? error.message : "unknown"}`,
+        error instanceof Error ? error.stack : undefined
+      );
+
+      const fallbackItems = this.generateFallbackScheduleItems(project);
+      const schedule = await this.replaceSchedule(project.id, "ai", fallbackItems);
+
       await this.prisma.aiRequestHistory.create({
         data: {
           projectId: project.id,
           targetType: "schedule",
           requestedByUserId: user.id,
-          prompt: "프로젝트 일정 생성",
-          resultSummary: error instanceof Error ? error.message : "일정 생성 실패",
-          status: "failed"
+          prompt: "프로젝트 일정 생성 (장애 복구 Fallback 적용)",
+          resultSummary: error instanceof Error ? `AI 장애 복구 적용: ${error.message}` : "Fallback 적용",
+          status: "success"
         }
       });
 
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      if (error instanceof z.ZodError) {
-        throw new BadRequestException(`AI가 생성한 일정 데이터 형식이 올바르지 않습니다: ${error.issues[0]?.message} (${error.issues[0]?.path.join(".")})`);
-      }
-      if (error instanceof SyntaxError) {
-        throw new BadRequestException("AI가 올바른 JSON 형식의 일정을 생성하지 못했습니다. 다시 시도해 주세요.");
-      }
-      throw new ServiceUnavailableException(
-        error instanceof Error ? `AI 일정 생성에 실패했습니다: ${error.message}` : "AI 일정 생성에 실패했어요."
-      );
+      return schedule;
     }
   }
 
@@ -705,14 +702,31 @@ export class ProjectsService {
       project.members.filter((member) => member.status === "accepted").map((member) => member.userId)
     );
 
+    const projectStart = project.startDate;
+    const projectEnd = project.endDate;
+    const format = (d: Date) => d.toISOString().slice(0, 10);
+
     return items.map((item) => {
       let type = (item.type || "task").toLowerCase();
       if (type !== "task" && type !== "sprint" && type !== "meeting") {
         type = "task";
       }
 
-      const startDate = (item.startDate || "").slice(0, 10);
-      const endDate = (item.endDate || "").slice(0, 10);
+      let sDate = new Date(`${item.startDate}T00:00:00.000Z`);
+      let eDate = new Date(`${item.endDate}T00:00:00.000Z`);
+
+      if (Number.isNaN(sDate.getTime())) sDate = new Date(projectStart);
+      if (Number.isNaN(eDate.getTime())) eDate = new Date(projectEnd);
+
+      if (sDate.getTime() < projectStart.getTime()) {
+        sDate = new Date(projectStart);
+      }
+      if (eDate.getTime() > projectEnd.getTime()) {
+        eDate = new Date(projectEnd);
+      }
+      if (eDate.getTime() < sDate.getTime()) {
+        eDate = new Date(sDate);
+      }
 
       const assigneeUserIds = (item.assigneeUserIds || [])
         .filter((userId) => typeof userId === "string" && acceptedUserIds.has(userId));
@@ -720,8 +734,8 @@ export class ProjectsService {
       return {
         ...item,
         type: type as "task" | "sprint" | "meeting",
-        startDate,
-        endDate,
+        startDate: format(sDate),
+        endDate: format(eDate),
         assigneeUserIds
       };
     });
@@ -1128,5 +1142,58 @@ export class ProjectsService {
 
   private toDateOnly(date: Date): string {
     return date.toISOString().slice(0, 10);
+  }
+
+  private generateFallbackScheduleItems(project: ProjectForSummary): ScheduleItemInput[] {
+    const start = project.startDate;
+    const end = project.endDate;
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    const acceptedMembers = project.members.filter((m) => m.status === "accepted");
+    const leaderUserId = acceptedMembers.find((m) => m.role === "leader")?.userId || "";
+    const assigneeUserIds = leaderUserId ? [leaderUserId] : [];
+
+    const format = (d: Date) => d.toISOString().slice(0, 10);
+
+    const item1Start = new Date(start);
+    const item1End = new Date(start);
+    item1End.setDate(item1End.getDate() + Math.max(1, Math.floor(diffDays * 0.1)));
+
+    const item2Start = new Date(item1End);
+    item2Start.setDate(item2Start.getDate() + 1);
+    const item2End = new Date(end);
+    item2End.setDate(item2End.getDate() - Math.max(1, Math.floor(diffDays * 0.2)));
+
+    const item3Start = new Date(item2End);
+    item3Start.setDate(item3Start.getDate() + 1);
+    const item3End = new Date(end);
+
+    return [
+      {
+        title: "프로젝트 기획 및 킥오프",
+        type: "meeting",
+        description: "AI 일정 생성 장애로 인해 자동 생성된 킥오프 일정입니다. 상세 업무 범위와 마일스톤을 기획합니다.",
+        assigneeUserIds,
+        startDate: format(item1Start),
+        endDate: format(item1End)
+      },
+      {
+        title: "핵심 기능 구현 및 개발",
+        type: "task",
+        description: "AI 일정 생성 장애로 인해 자동 생성된 기본 개발 일정입니다. 화면 UI 설계 및 비즈니스 기능 개발을 진행합니다.",
+        assigneeUserIds,
+        startDate: format(item2Start),
+        endDate: format(item2End)
+      },
+      {
+        title: "최종 테스트 및 배포",
+        type: "sprint",
+        description: "AI 일정 생성 장애로 인해 자동 생성된 최종 테스트 일정입니다. 오류 검증 및 상용 환경에 배포합니다.",
+        assigneeUserIds,
+        startDate: format(item3Start),
+        endDate: format(item3End)
+      }
+    ];
   }
 }

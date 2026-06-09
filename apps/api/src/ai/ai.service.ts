@@ -242,10 +242,14 @@ export class AiService {
   private extractJson(text: string): string {
     const trimmed = text.trim();
     const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (fenced?.[1]) {
-      return fenced[1].trim();
+    const target = fenced?.[1] ? fenced[1].trim() : trimmed;
+
+    const firstBrace = target.indexOf("{");
+    const lastBrace = target.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      return target.slice(firstBrace, lastBrace + 1);
     }
-    return trimmed;
+    return target;
   }
 
   private async generateText(prompt: string): Promise<string> {
