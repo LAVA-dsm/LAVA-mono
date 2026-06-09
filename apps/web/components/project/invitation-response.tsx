@@ -93,6 +93,7 @@ export function InvitationResponse({ token }: { token: string }) {
         availableTimes
       };
       const project = await apiClient.acceptInvitation(token, payload);
+      router.refresh();
       router.push(`/projects/${project.id}`);
     } catch (acceptError) {
       const message = acceptError instanceof Error ? acceptError.message : "초대 수락에 실패했어요.";

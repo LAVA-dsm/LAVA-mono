@@ -176,6 +176,7 @@ export function ProjectWizard() {
     try {
       const payload = buildPayload();
       const project = await apiClient.createProject(payload);
+      router.refresh();
       router.push(`/projects/${project.id}`);
     } catch (createError) {
       const message =
