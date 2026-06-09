@@ -55,10 +55,11 @@ async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> 
 
   if (!response.ok) {
     if (response.status === 404) {
-      if (path === "/projects") {
+      const normalizedPath = path.split("?")[0].replace(/\/$/, "");
+      if (normalizedPath === "/projects") {
         return { projects: [] } as unknown as T;
       }
-      if (path === "/projects/calendar-items") {
+      if (normalizedPath === "/projects/calendar-items") {
         return { items: [] } as unknown as T;
       }
     }

@@ -12,7 +12,9 @@ async function bootstrap() {
 
   app.enableCors({
     origin: frontendOrigins,
-    credentials: true
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["content-type", "authorization", "cookie", "origin"]
   });
 
   // Swagger 명세 설정
@@ -31,6 +33,21 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);
+
+  // 서버 부팅 시 환경변수 진단 로그 출력
+  console.log("=== LAVA API Server Boot Diagnostics ===");
+  console.log(`PORT: ${port}`);
+  console.log(`NODE_ENV: ${process.env.NODE_ENV ?? "(not set)"}`);
+  console.log(`FRONTEND_ORIGIN: ${process.env.FRONTEND_ORIGIN ?? "(not set)"}`);
+  console.log(`CORS allowed origins: ${JSON.stringify(frontendOrigins)}`);
+  console.log(`FRONTEND_PUBLIC_URL: ${process.env.FRONTEND_PUBLIC_URL ?? "(not set)"}`);
+  console.log(`COOKIE_DOMAIN: ${process.env.COOKIE_DOMAIN ?? "(not set)"}`);
+  console.log(`DATABASE_URL: ${process.env.DATABASE_URL ? "✅ set" : "❌ NOT SET"}`);
+  console.log(`OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? "✅ set" : "❌ NOT SET"}`);
+  console.log(`OPENAI_MODEL: ${process.env.OPENAI_MODEL ?? "(not set, default gpt-5-mini)"}`);
+  console.log(`SMTP_HOST: ${process.env.SMTP_HOST ?? "(not set)"}`);
+  console.log("=========================================");
 }
 
 void bootstrap();
+

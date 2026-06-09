@@ -1117,18 +1117,19 @@ export class ProjectsService {
   private buildInvitationUrl(token: string, requestOrigin?: string): string {
     let origin = "https://lava-mono-web.vercel.app";
 
-    if (process.env.FRONTEND_PUBLIC_URL?.trim()) {
+    const isLocalhost = (url: string) => url.includes("localhost") || url.includes("127.0.0.1");
+
+    if (process.env.FRONTEND_PUBLIC_URL?.trim() && !isLocalhost(process.env.FRONTEND_PUBLIC_URL)) {
       origin = process.env.FRONTEND_PUBLIC_URL.trim();
     } else if (
       requestOrigin?.trim() &&
-      !requestOrigin.includes("localhost") &&
-      !requestOrigin.includes("127.0.0.1")
+      !isLocalhost(requestOrigin)
     ) {
       origin = requestOrigin.trim();
     } else if (process.env.FRONTEND_ORIGIN?.trim()) {
       const publicOrigin = process.env.FRONTEND_ORIGIN.split(",")
         .map((o) => o.trim())
-        .find((o) => !o.includes("localhost") && !o.includes("127.0.0.1"));
+        .find((o) => !isLocalhost(o));
       if (publicOrigin) {
         origin = publicOrigin;
       }
