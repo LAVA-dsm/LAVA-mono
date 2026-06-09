@@ -109,16 +109,20 @@ export class AiService {
     let featureSpecFailed = false;
     let apiSpecFailed = false;
 
-    try {
-      featureSpec = await this.generateFeatureSpec(input);
-      featureSpec = featureSpec.slice(0, 2000);
-    } catch {
+    const [featureSpecResult, apiSpecResult] = await Promise.allSettled([
+      this.generateFeatureSpec(input),
+      this.generateApiSpec(input)
+    ]);
+
+    if (featureSpecResult.status === "fulfilled") {
+      featureSpec = featureSpecResult.value.slice(0, 2000);
+    } else {
       featureSpecFailed = true;
     }
 
-    try {
-      apiSpec = await this.generateApiSpec(input, featureSpec);
-    } catch {
+    if (apiSpecResult.status === "fulfilled") {
+      apiSpec = apiSpecResult.value;
+    } else {
       apiSpecFailed = true;
     }
 
@@ -209,7 +213,7 @@ export class AiService {
     return this.generateText(prompt);
   }
 
-  private async generateApiSpec(input: ProjectCreateInput, featureSpec: string): Promise<string> {
+  private async generateApiSpec(input: ProjectCreateInput, featureSpec?: string): Promise<string> {
     const idea = input.enhancedIdea || input.originalIdea;
     const prompt = [
       "아래 프로젝트를 위한 API 명세서를 Markdown으로 작성하세요.",
@@ -217,12 +221,12 @@ export class AiService {
       "구성은 다음 5개 섹션만 사용하세요: 인증, 프로젝트, 초대, 문서, 일정.",
       "각 섹션에는 필요한 API만 1~3개씩 적으세요.",
       "각 API에는 이름, 메서드, 경로, 요청, 응답, 예외만 간결하게 적으세요.",
-      "전체 분량은 기능 명세서보다 짧고, 불필요한 설명은 넣지 마세요.",
+      "전체 분량은 간결하게 작성하고, 불필요한 설명은 넣지 마세요.",
       `프로젝트명: ${input.name}`,
       `프로젝트 유형: ${input.type}`,
       `아이디어:\n${idea}`,
-      `기능 명세서:\n${featureSpec}`
-    ].join("\n\n");
+      featureSpec ? `기능 명세서:\n${featureSpec}` : ""
+    ].filter(Boolean).join("\n\n");
 
     return this.generateText(prompt);
   }
