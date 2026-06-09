@@ -116,7 +116,7 @@ export function ProjectWizard() {
     const parsed = projectCreateInputSchema.safeParse({
       name: form.name,
       type: form.type,
-      originalIdea: form.originalIdea,
+      originalIdea: form.ideaEnhancementUsed && form.enhancedIdea ? form.enhancedIdea : form.originalIdea,
       enhancedIdea: form.ideaEnhancementUsed ? form.enhancedIdea : undefined,
       ideaEnhancementUsed: form.ideaEnhancementUsed,
       startDate: form.startDate,

@@ -62,7 +62,12 @@ export class ProjectsService {
   async createProject(input: ProjectCreateInput, user: CurrentUser, originHeaders?: string): Promise<ProjectSummary> {
     const inviteEmails = input.type === "team" ? input.inviteEmails : [];
     const invitationDrafts = inviteEmails.map((email) => this.createInvitationDraft(email));
-    const persistedInput = { ...input, inviteEmails };
+    
+    const originalIdea = input.ideaEnhancementUsed && input.enhancedIdea
+      ? input.enhancedIdea
+      : input.originalIdea;
+
+    const persistedInput = { ...input, originalIdea, inviteEmails };
 
     const project = await this.prisma.$transaction(async (tx) => {
       const createdProject = await tx.project.create({
